@@ -1,6 +1,5 @@
 import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "/vite.svg";
+
 import "./App.css";
 
 let GroceryItems = [
@@ -11,60 +10,76 @@ let GroceryItems = [
   { category: "Vegetables", name: "Onions", checked: false },
   { category: "Vegetables", name: "Radish", checked: false },
 ];
-function App() {
-  function ProductCategoryRow({ category }) {
-    return (
-      <tr>
-        <th colSpan="2">{category}</th>
-      </tr>
-    );
-  }
 
-  function ProductRow({ product }) {
-    const name = product.checked ? (
-      product.name
-    ) : (
-      <span style={{ color: "red" }}>{product.name}</span>
-    );
-    return (
-      <tr>
-        <td>
-          <input type="checkbox" />
-          {name}
-        </td>
-        <td>{product.price}</td>
-      </tr>
-    );
-  }
-
-  function ProductTable({ products }) {
-    const rows = [];
-    let lastCategory = null;
-    products.forEach((product) => {
-      if (product.category !== lastCategory) {
-        rows.push(
-          <ProductCategoryRow
-            category={product.category}
-            key={product.category}
-          />
-        );
-      }
-
-      rows.push(<ProductRow product={product} key={product.name} />);
-      lastCategory = product.category;
-    });
-    return (
-      <table>
-        <tbody>{rows}</tbody>
-      </table>
-    );
-  }
-
+function FilterableGroceryItems({ products }) {
+  const [filterText, setFilterText] = useState("");
+  const [uncheckedOnly, setUncheckedOnly] = useState(false);
   return (
     <>
-      <ProductTable products={GroceryItems} />
+      <SearchBar filterText={filterText} unchecked={uncheckedOnly} />
+      <GroceryItemTable products={products} />
     </>
   );
 }
+function GroceryCategoryRow({ category }) {
+  return (
+    <tr>
+      <th colSpan="2">{category}</th>
+    </tr>
+  );
+}
 
-export default App;
+function GroceryItemRow({ product }) {
+  const name = product.checked ? (
+    product.name
+  ) : (
+    <span style={{ color: "red" }}>{product.name}</span>
+  );
+  return (
+    <tr>
+      <td>
+        <input type="checkbox" />
+        {name}
+      </td>
+      <td>{product.price}</td>
+    </tr>
+  );
+}
+
+function GroceryItemTable({ products }) {
+  const rows = [];
+  let lastCategory = null;
+  products.forEach((product) => {
+    if (product.category !== lastCategory) {
+      rows.push(
+        <GroceryCategoryRow
+          category={product.category}
+          key={product.category}
+        />
+      );
+    }
+
+    rows.push(<GroceryItemRow product={product} key={product.name} />);
+    lastCategory = product.category;
+  });
+  return (
+    <table>
+      <tbody>{rows}</tbody>
+    </table>
+  );
+}
+function SearchBar() {
+  return (
+    <form>
+      <input type="text" placeholder="Search.." />
+      <label>
+        <input type="checkbox" />
+        Only show unchecked items
+      </label>
+    </form>
+  );
+}
+
+export default function App() {
+  return <FilterableGroceryItems products={GroceryItems} />;
+}
