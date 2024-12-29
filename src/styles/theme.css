@@ -31,7 +31,9 @@ form {
     width: 600px;
     margin: 32px auto 50px auto;
     background: #fff;
+    padding: 7px;
     box-shadow: 0 1px 7px rgb(128, 128, 128);
+    border-radius: 7px;
 }
 
 form input {
@@ -41,5 +43,12 @@ form input {
     margin-bottom: 20px;
     outline: none;
     font-size: 1rem;
+    resize: none;
+    height: 32px;
 }
-
+form li .input-list-checkbox {
+    width: 5%;
+    height: 16px;
+    margin-bottom:6px;
+}
+.checked { text-decoration: line-through; }
