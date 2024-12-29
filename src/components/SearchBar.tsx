@@ -1,17 +1,9 @@
 // import React from "react";
-
+import "../styles/theme.css";
 export const SearchBar = () => {
-  return <div>SearchBar</div>;
+  return (
+    <div>
+      <input type="text" className="search-bar" placeholder="Search.." />
+    </div>
+  );
 };
-
-// export const SearchBar = (filterText: Products, uncheckedOnly: boolean) => {
-//   return (
-//     <form>
-//       <input type="text" placeholder="Search.." />
-//       <label>
-//         <input type="checkbox" value={filterText} onChange={uncheckedOnly} />
-//         Only show unchecked items
-//       </label>
-//     </form>
-//   );
-// };
