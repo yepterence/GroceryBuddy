@@ -14,7 +14,7 @@ const CreateItemList = () => {
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter" && newItem.trim() !== "") {
+    if (e.key === "Enter") {
       e.preventDefault();
       setItems([...items, { name: newItem, checked: false }]);
       setNewItem("");
@@ -31,7 +31,7 @@ const CreateItemList = () => {
 
   return (
     <div>
-      <form onSubmit={(e) => e.preventDefault()}>
+      <form>
         <input
           type="text"
           name="title"
@@ -40,7 +40,10 @@ const CreateItemList = () => {
           onChange={handleTitleChange}
         />
         {items.map((item, index) => (
-          <li key={index} className={item.checked ? "checked" : ""}>
+          <li
+            key={index}
+            className={item.checked ? "list-item-checked" : "list-item"}
+          >
             <input
               type="checkbox"
               checked={item.checked}
@@ -57,10 +60,10 @@ const CreateItemList = () => {
           onChange={handleNewItemChange}
           onKeyDown={handleKeyDown}
         />
+        <button type="submit" onClick={(e) => handleFormSubmit(e)}>
+          Add
+        </button>
       </form>
-      <div>
-        <h3>{title}</h3>
-      </div>
     </div>
   );
 };

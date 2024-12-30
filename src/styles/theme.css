@@ -46,9 +46,18 @@ form input {
     resize: none;
     height: 32px;
 }
-form li .input-list-checkbox {
+form div .input-list-checkbox {
     width: 5%;
     height: 16px;
     margin-bottom:6px;
 }
-.checked { text-decoration: line-through; }
+form button {
+    background: #6CBDE9;
+}
+.list-item { 
+    list-style: none;
+}
+.list-item-checked { 
+    text-decoration: line-through; 
+    list-style: none;
+}
