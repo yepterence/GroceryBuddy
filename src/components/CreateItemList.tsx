@@ -1,22 +1,30 @@
-import { useState } from "react";
+import { SetStateAction, useState } from "react";
+import { useListStore } from "../store/applicationStore";
+import { v4 as uuidv4 } from "uuid";
 
 const CreateItemList = () => {
+  const addGroceryList = useListStore((state) => state.addGroceryList);
   const [title, setTitle] = useState("");
-  const [newItem, setNewItem] = useState("");
-  const [items, setItems] = useState([]);
+  const [newItem, setNewItem] = useState<string>("");
+  const [items, setItems] = useState<{}[]>([]);
 
-  const handleTitleChange = (e) => {
+  const handleTitleChange = (e: {
+    target: { value: SetStateAction<string> };
+  }) => {
     setTitle(e.target.value);
   };
 
-  const handleNewItemChange = (e) => {
+  const handleNewItemChange = (e: {
+    target: { value: SetStateAction<string> };
+  }) => {
     setNewItem(e.target.value);
   };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: { key: string; preventDefault: () => void }) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      setItems([...items, { name: newItem, checked: false }]);
+      const newId = uuidv4();
+      setItems([...items, { id: newId, name: newItem, checked: false }]);
       setNewItem("");
     }
   };
@@ -29,6 +37,15 @@ const CreateItemList = () => {
     );
   };
 
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    const listId = uuidv4();
+    console.log(e.target);
+    const payload = { id: listId, title: title, contents: items };
+    addGroceryList(payload);
+    setTitle("");
+    setItems([]);
+  };
   return (
     <div>
       <form>
@@ -39,20 +56,21 @@ const CreateItemList = () => {
           value={title}
           onChange={handleTitleChange}
         />
-        {items.map((item, index) => (
-          <li
-            key={index}
-            className={item.checked ? "list-item-checked" : "list-item"}
-          >
-            <input
-              type="checkbox"
-              checked={item.checked}
-              className="input-list-checkbox"
-              onChange={() => toggleItemChecked(index)}
-            />
-            {item.name}
-          </li>
-        ))}
+        {items &&
+          items.map((item) => (
+            <li
+              key={item.id}
+              className={item.checked ? "list-item-checked" : "list-item"}
+            >
+              <input
+                type="checkbox"
+                checked={item.checked}
+                className="input-list-checkbox"
+                onChange={() => toggleItemChecked(item.id)}
+              />
+              {item.name}
+            </li>
+          ))}
         <input
           type="text"
           placeholder="New Item"
@@ -60,7 +78,7 @@ const CreateItemList = () => {
           onChange={handleNewItemChange}
           onKeyDown={handleKeyDown}
         />
-        <button type="submit" onClick={(e) => handleFormSubmit(e)}>
+        <button type="submit" onClick={handleFormSubmit}>
           Add
         </button>
       </form>
