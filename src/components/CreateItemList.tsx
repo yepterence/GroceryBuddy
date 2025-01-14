@@ -1,4 +1,4 @@
-import { SetStateAction, useState } from "react";
+import { SetStateAction, useState, useRef } from "react";
 import { useListStore } from "../store/applicationStore";
 import { v4 as uuidv4 } from "uuid";
 
@@ -7,6 +7,7 @@ const CreateItemList = () => {
   const [title, setTitle] = useState("");
   const [newItem, setNewItem] = useState<string>("");
   const [items, setItems] = useState<{}[]>([]);
+  const nextInputRef = useRef<HTMLInputElement>(null);
 
   const handleTitleChange = (e: {
     target: { value: SetStateAction<string> };
@@ -29,12 +30,22 @@ const CreateItemList = () => {
     }
   };
 
-  const toggleItemChecked = (index) => {
+  const toggleItemChecked = (itemId: string) => {
     setItems(
-      items.map((item, i) =>
-        i === index ? { ...item, checked: !item.checked } : item
+      items.map((item) =>
+        item.id === itemId ? { ...item, checked: !item.checked } : item
       )
     );
+  };
+
+  const handleTitleKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      setTitle(e.target.value);
+      if (nextInputRef.current) {
+        nextInputRef.current.focus();
+      }
+    }
   };
 
   const handleFormSubmit = (e) => {
@@ -55,6 +66,7 @@ const CreateItemList = () => {
           placeholder="Title"
           value={title}
           onChange={handleTitleChange}
+          onKeyDown={(e) => handleTitleKeyDown(e)}
         />
         {items &&
           items.map((item) => (
@@ -77,6 +89,7 @@ const CreateItemList = () => {
           value={newItem}
           onChange={handleNewItemChange}
           onKeyDown={handleKeyDown}
+          ref={nextInputRef}
         />
         <button type="submit" onClick={handleFormSubmit}>
           Add

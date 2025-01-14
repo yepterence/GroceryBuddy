@@ -46,7 +46,7 @@ form input {
     resize: none;
     height: 32px;
 }
-form div .input-list-checkbox {
+form li .input-list-checkbox {
     width: 5%;
     height: 16px;
     margin-bottom:6px;
