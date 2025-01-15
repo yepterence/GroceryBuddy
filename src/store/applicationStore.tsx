@@ -7,19 +7,24 @@ interface Item {
 }
 
 interface GroceryList {
+  id: string;
   title: string;
   items: Item[];
 }
 
 interface ListStore {
-  groceryLists: { groceryList: GroceryList }[];
+  groceryLists: GroceryList[];
   addGroceryList: (gorceryList: GroceryList) => void;
 }
 
 export const useListStore = create<ListStore>((set) => ({
   groceryLists: [],
-  addGroceryList: (groceryList: GroceryList) =>
-    set((state) => ({
-      groceryLists: [...state.groceryLists, { groceryList }],
-    })),
+  addGroceryList: (groceryList: GroceryList) => {
+    set((state) => {
+      return {
+        ...state,
+        groceryLists: [...state.groceryLists, groceryList],
+      };
+    });
+  },
 }));

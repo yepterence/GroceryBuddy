@@ -7,7 +7,6 @@ import { useListStore } from "./store/applicationStore";
 
 export const App = () => {
   const { groceryLists } = useListStore();
-  console.log({ groceryLists });
   return (
     <>
       <Header />

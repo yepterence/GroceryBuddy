@@ -1,23 +1,38 @@
 const GroceryDashboard = ({ lists }) => {
+  // console.log(lists);
+  // const mappedLists = lists.map((listItem) => {
+  //   console.log(listItem.id);
+  //   console.log(listItem.title);
+  // });
+  // console.log("tests");
   return (
-    <div className="lists">
-      {lists &&
-        lists.map((item) => (
-          <>
-            <h3>{item.title}</h3>
-            <div key={item.id}>
-              <li className={item.checked ? "list-item-checked" : "list-item"}>
-                <input
-                  type="checkbox"
-                  checked={item.checked}
-                  className="input-list-checkbox"
-                />
-                {item.name}
-              </li>
-            </div>
-          </>
-        ))}
-    </div>
+    <>
+      <div>Grocery List Dashboard</div>
+      <div className="lists">
+        {lists &&
+          lists?.map((newList) => (
+            <>
+              <h3>{newList.title}</h3>
+              <div key={newList.id}>
+                <ul>
+                  {newList.contents.map((item) => (
+                    <li>
+                      <input
+                        type="checkbox"
+                        checked={item.checked}
+                        className={
+                          newList.checked ? "list-item-checked" : "list-item"
+                        }
+                      />
+                      {item.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          ))}
+      </div>
+    </>
   );
 };
 
