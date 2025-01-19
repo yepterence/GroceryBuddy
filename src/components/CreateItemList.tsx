@@ -1,12 +1,13 @@
-import { SetStateAction, useState, useRef } from "react";
+import { SetStateAction, useState, useRef, KeyboardEvent } from "react";
 import { useListStore } from "../store/applicationStore";
 import { v4 as uuidv4 } from "uuid";
+import { Item } from "../types";
 
 const CreateItemList = () => {
   const addGroceryList = useListStore((state) => state.addGroceryList);
   const [title, setTitle] = useState("");
   const [newItem, setNewItem] = useState<string>("");
-  const [items, setItems] = useState<{}[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
   const nextInputRef = useRef<HTMLInputElement>(null);
 
   const handleTitleChange = (e: {
@@ -38,20 +39,19 @@ const CreateItemList = () => {
     );
   };
 
-  const handleTitleKeyDown = (e) => {
+  const handleTitleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      setTitle(e.target.value);
+      setTitle((e.target as HTMLInputElement).value);
       if (nextInputRef.current) {
         nextInputRef.current.focus();
       }
     }
   };
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = (e: { preventDefault: () => void }) => {
     e.preventDefault();
     const listId = uuidv4();
-    console.log(e.target);
     const payload = { id: listId, title: title, contents: items };
     addGroceryList(payload);
     setTitle("");

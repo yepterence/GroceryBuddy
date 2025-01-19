@@ -9,7 +9,7 @@ interface Item {
 interface GroceryList {
   id: string;
   title: string;
-  items: Item[];
+  contents: Item[];
 }
 
 interface ListStore {
