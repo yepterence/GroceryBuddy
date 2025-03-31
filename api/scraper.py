@@ -11,11 +11,11 @@ GROCERY_STORES = [
     "Sobeys",
     "Costco",
     "Longos",
-    "Farm Boy",
-    "Food Basics",
+    "Farm_Boy",
+    "Food_Basics",
     "FreshCo",
-    "Central Fresh Market",
-    "T&T Supermarket",
+    "Central_Fresh_Market",
+    "T&T_Supermarket",
     "Save A Lot Grocery Outlet",
 ]
 
@@ -123,7 +123,7 @@ class Scraper:
         response = requests.get(url)
         return response.json()
 
-    def generate_item_dict(self, flyer):
+    def generate_items_dict(self, flyer):
         """given a flyer, retrieve all the flyer's items and the associated prices if available."""
         flyer_items = []
         for item in flyer:
@@ -136,8 +136,33 @@ class Scraper:
 
         return flyer_items
 
-    def get_price_dict(self):
-        return
+    def get_price_dict(self, items):
+        price_payload = {}
+        # Loop over list of items, retrieve flyers based on stores
+        # Find item in flyer
+        # if none of flyers contain
+        # Return payload in format of
+        # [{item : {merchant_name: [{flyer_item_name: , price: , brand: }]}}]
+        all_flyers_in_data = [
+            json_file
+            for json_file in self.data_folder_path.iterdir()
+            if json_file.is_file() and json_file.suffix == ".json"
+        ]
+        flyers_filtered_to_stores = [
+            store for store in GROCERY_STORES if store in all_flyers_in_data
+        ]
+        for flyer in flyers_filtered_to_stores:
+            flyer_path = self.data_folder_path / flyer
+            with open(flyer_path) as f:
+                flyer_items_data = json.load(f)
+                flyer_json = flyer_items_data.get("flyer_json")
+                items_dict = self.generate_items_dict(flyer_json)
+                # Parse through list of objects (flyer items) within a store flyer
+            for item in items:
+                for grocery_item in items_dict.keys():
+                    if item in grocery_item:
+                        price_payload[item] = grocery_item.value()
+        return price_payload
 
     def write_data_to_path(self, data, f_name):
         """Write data into a json file to destination"""
