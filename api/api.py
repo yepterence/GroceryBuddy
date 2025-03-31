@@ -14,10 +14,13 @@ async def bp_root(request):
     return json({"server_name": "grocery_buddy_server"})
 
 
-@bp.route("/get-flyers")
-async def bp_get_flyers(request):
-    scraped_flyer = Scraper("")
-    print(scraped_flyer)
+@bp.route("/get-prices")
+async def get_flyer_prices(request):
+    locale = request.args.get("locale")
+    postal_code = request.args.get("postal_code")
+    scraped_flyer = Scraper(locale, postal_code)
+    price_payload = scraped_flyer.get_price_dict()
+    return json(scraped_flyer)
 
 
 app.blueprint(bp)

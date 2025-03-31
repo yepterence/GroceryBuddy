@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# pycache
+__pycache__/
+
+# env
+gb-api/
+
+# Projectdata
+data/
