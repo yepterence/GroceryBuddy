@@ -18,9 +18,10 @@ async def bp_root(request):
 async def get_flyer_prices(request):
     locale = request.args.get("locale")
     postal_code = request.args.get("postal_code")
+    items = request.args.get("list-items")
     scraped_flyer = Scraper(locale, postal_code)
-    price_payload = scraped_flyer.get_price_dict()
-    return json(scraped_flyer)
+    price_payload = scraped_flyer.get_price_dict(items)
+    return json(price_payload)
 
 
 app.blueprint(bp)

@@ -9,6 +9,7 @@ from pathlib import Path
 
 GROCERY_STORES = [
     "Sobeys",
+    "Real_Canadian_Super_Store",
     "Costco",
     "Longos",
     "Farm_Boy",
@@ -16,7 +17,9 @@ GROCERY_STORES = [
     "FreshCo",
     "Central_Fresh_Market",
     "T&T_Supermarket",
-    "Save A Lot Grocery Outlet",
+    "Save_A_Lot_Grocery_Outlet",
+    "Walmart",
+    "M&M",
 ]
 
 BASE_URL = "https://flyers-ng.flippback.com/api/flipp"
@@ -87,14 +90,22 @@ class Scraper:
                         flyer_details.get("valid_to")
                     ).date()
                     f_name = (
-                        flyer_details.get("flyer_name")
-                        .replace(" ", "_")
-                        .replace("/", "_")
+                        (
+                            flyer_details.get("flyer_name")
+                            .replace(" ", "_")
+                            .replace("/", "_")
+                        )
+                        .encode()
+                        .decode("unicode_escape")
                     )
                     f_merchant = (
-                        flyer_details.get("flyer_merchant")
-                        .replace(" ", "_")
-                        .replace("/", "_")
+                        (
+                            flyer_details.get("flyer_merchant")
+                            .replace(" ", "_")
+                            .replace("/", "_")
+                        )
+                        .encode()
+                        .decode("unicode_escape")
                     )
                     flyer_name = f"{f_name}_{f_merchant}_{f_valid_to}"
                     target_url = f"{self.base_url}/flyers/{f_id}/flyer_items"
@@ -129,39 +140,58 @@ class Scraper:
         for item in flyer:
             item_dict = {}
             name = item.get("name")
+            name_decoded = (
+                name.encode().decode("unicode_escape")
+                if name
+                else "No item name provided."
+            )
             price = item.get("price")
             brand = item.get("brand")
-            item_dict[name] = {"price": price, "brand": brand}
+            brand_decoded = (
+                brand.encode().decode("unicode_escape")
+                if brand
+                else "No brand provided."
+            )
+            item_dict[name_decoded] = {"price": price, "brand": brand_decoded}
             flyer_items.append(item_dict)
 
         return flyer_items
 
     def get_price_dict(self, items):
-        price_payload = {}
-        # Loop over list of items, retrieve flyers based on stores
-        # Find item in flyer
-        # if none of flyers contain
-        # Return payload in format of
-        # [{item : {merchant_name: [{flyer_item_name: , price: , brand: }]}}]
+        """Retrieve price and brand for a given store flyer that matches the items provided by user."""
+        price_payload = {key: [] for key in items}
         all_flyers_in_data = [
-            json_file
+            json_file.name
             for json_file in self.data_folder_path.iterdir()
             if json_file.is_file() and json_file.suffix == ".json"
         ]
-        flyers_filtered_to_stores = [
-            store for store in GROCERY_STORES if store in all_flyers_in_data
-        ]
+
+        flyers_filtered_to_stores = []
+        for store_flyer in all_flyers_in_data:
+            for grocery_store in GROCERY_STORES:
+                if grocery_store in store_flyer:
+                    flyers_filtered_to_stores.append(store_flyer)
+
         for flyer in flyers_filtered_to_stores:
             flyer_path = self.data_folder_path / flyer
             with open(flyer_path) as f:
                 flyer_items_data = json.load(f)
-                flyer_json = flyer_items_data.get("flyer_json")
-                items_dict = self.generate_items_dict(flyer_json)
+            store = list(flyer_items_data.keys())[0]
+            for flyer_value in flyer_items_data.values():
+                flyer_json = flyer_value.get("flyer_json")
+                all_flyer_items = self.generate_items_dict(flyer_json)
                 # Parse through list of objects (flyer items) within a store flyer
             for item in items:
-                for grocery_item in items_dict.keys():
-                    if item in grocery_item:
-                        price_payload[item] = grocery_item.value()
+                matching_items_array = []
+                for g_items_dict in all_flyer_items:
+                    for g_item_key, g_item_value in g_items_dict.items():
+                        # Dealing with multiple g_items matching item
+                        if item in g_item_key:
+                            print(f"Found {item} in {g_item_key}")
+                            g_item_value["store"] = store
+                            matching_items_array.append(g_item_value)
+                price_payload[item].extend(matching_items_array)
+
         return price_payload
 
     def write_data_to_path(self, data, f_name):
@@ -195,9 +225,4 @@ if __name__ == "__main__":
     flyer_response = scraper.fetch_url_response_json(target)
     all_flyers = scraper.retrieve_flyer_infos_from_json(flyer_response)
     scraper.retrieve_all_grocery_flyers()
-    # price_dict = []
-    # for store in GROCERY_STORES:
-    #     store_price_dict = scraper.generate_item_dict(store)
-    #     price_dict.append(store_price_dict)
-
-    # item_data = scraper.get_item_price_info(flyer_response)
+    scraper.get_price_dict(["Broccoli", "Cauliflower", "Mango", "Mushrooms", "Bread"])
