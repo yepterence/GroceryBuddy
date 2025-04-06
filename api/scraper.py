@@ -187,7 +187,6 @@ class Scraper:
                     for g_item_key, g_item_value in g_items_dict.items():
                         # Dealing with multiple g_items matching item
                         if item in g_item_key:
-                            print(f"Found {item} in {g_item_key}")
                             g_item_value["store"] = store
                             matching_items_array.append(g_item_value)
                 price_payload[item].extend(matching_items_array)
