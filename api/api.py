@@ -2,11 +2,14 @@
 
 from sanic import Sanic
 from sanic import Blueprint
+from sanic_ext import Extend
 from sanic.response import json
 from scraper import Scraper
 
 bp = Blueprint("lists_blueprint")
 app = Sanic("grocery_buddy_server")
+app.config.CORS_ORIGINS = "http://localhost:3001"
+Extend(app)
 
 
 @bp.route("/")
@@ -18,7 +21,7 @@ async def bp_root(request):
 async def get_flyer_prices(request):
     locale = request.args.get("locale")
     postal_code = request.args.get("postal_code")
-    items = request.args.get("list-items")
+    items = request.args.getlist("list-items")
     scraped_flyer = Scraper(locale, postal_code)
     price_payload = scraped_flyer.get_price_dict(items)
     return json(price_payload)
