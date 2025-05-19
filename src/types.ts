@@ -13,3 +13,9 @@ export interface GroceryList {
 export interface GroceryLists {
   lists: GroceryList[];
 }
+
+export interface DropdownDetailsProps {
+  price: string;
+  store: string;
+  brand: string;
+}
