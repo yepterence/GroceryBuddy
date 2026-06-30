@@ -1,6 +1,7 @@
 # PRD 03 — AI Capture + Nutrition (incl. Mobile Capture)
 
 > Status: Draft v0.1 · Goals: G4 · Depends on: PRD 01 · Index: [`README.md`](./README.md)
+> Portfolio v1: **BUILD (thin)** — vision LLM (no training), nutrition via Open Food Facts / USDA
 
 ---
 

@@ -1,6 +1,7 @@
 # PRD 01 — Core Item Tracking
 
 > Status: Draft v0.1 · Goals: G1, G2 · Depends on: — · Index: [`README.md`](./README.md)
+> Portfolio v1: **BUILD** (foundation)
 
 ---
 

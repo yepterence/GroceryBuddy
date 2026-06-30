@@ -60,3 +60,32 @@ Companion technical design: [`../modular-recommendations-design.md`](../modular-
 - M4 kids' food, M5 restaurant-style (internet recipes + likes), M6 taste-matched kNN —
   tracked as exploratory recommenders once the framework (04) is proven. Each is purely
   additive (new module + registry entry).
+
+---
+
+## Portfolio v1 scope (built vs. designed-only)
+
+This project is intentionally scoped as a **portfolio piece**: ship one focused vertical
+slice that demonstrates the differentiated loop end-to-end, and *design* (not build) the
+rest. A small, finished slice + clear design docs signals deliberate scoping; a sprawling,
+half-built platform does not.
+
+**The differentiated loop to demonstrate:**
+`food photo → nutrition → nutrient gap → suggested item → price-matched against local flyer data`
+— this nutrition↔local-grocery bridge is the one genuinely under-served seam vs. market
+apps (MyFitnessPal/Cronometer stop at the gap; Flipp/Reebee don't know nutrition).
+
+| PRD / module | v1 status | Notes |
+|--------------|-----------|-------|
+| 01 Core item tracking | **Build** | Small foundation; needed-items + consumption history |
+| 03 AI capture + nutrition | **Build (thin)** | Use a **vision LLM** (no model training); nutrition via Open Food Facts / USDA |
+| M1 flyer/price (existing scraper) | **Build (wrap)** | Already exists — wrap `api/scraper.py` |
+| M3 recipe/item by nutrient gap | **Build (thin)** | Just enough to close the loop to M1 |
+| 04 Framework contract + registry | **Build (minimal)** | Prove the plugin contract with **2 modules** (M1 + M3) |
+| 02 Re-purchase (M2) | **Optional** | Nice third module if time allows |
+| M4 / M5 / M6 | **Design-only** | Documented as "designed, not built" + roadmap |
+| Data-moat machinery, custom model, native-mobile polish | **Out of scope** | Company concerns; in a portfolio they read as unfinished scope |
+
+**Why design-only is fine (and good):** demonstrating an extensible design + a credible
+roadmap (M4–M6 as drop-in modules) is stronger portfolio signal than half-building six
+modules. The PRDs themselves are part of the deliverable.

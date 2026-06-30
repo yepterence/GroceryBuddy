@@ -2,6 +2,8 @@
 
 > Status: Draft v0.1 · Goals: G5 · Depends on: PRD 01, 02, 03 · Index: [`README.md`](./README.md)
 > Technical companion: [`../modular-recommendations-design.md`](../modular-recommendations-design.md)
+> Portfolio v1: **BUILD (minimal)** — contract + registry proven with 2 modules (M1 + M3);
+> M4/M5/M6 are **design-only**
 
 ---
 

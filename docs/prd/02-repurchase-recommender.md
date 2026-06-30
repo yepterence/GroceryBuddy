@@ -1,6 +1,7 @@
 # PRD 02 — Re-purchase Recommender (Reference Module)
 
 > Status: Draft v0.1 · Goals: G3 · Depends on: PRD 01 · Index: [`README.md`](./README.md)
+> Portfolio v1: **OPTIONAL** (nice third module if time allows)
 
 ---
 
