@@ -1,9 +1,9 @@
 # Design Draft: Modular Recommendation Framework
 
 > Status: Draft v0.1 (technical design)
-> Companion to: `docs/PRD.md` (product requirements). This doc focuses on **how** the
-> modular recommender layer is built so the app can be extended for new purposes
-> (recipes, kids' food, restaurant-style cooking, taste-matched suggestions, ...).
+> Companion to: `docs/prd/04-recommendation-framework.md` (product requirements). This doc
+> focuses on **how** the modular recommender layer is built so the app can be extended for
+> new purposes (recipes, kids' food, restaurant-style cooking, taste-matched suggestions, ...).
 
 ---
 
