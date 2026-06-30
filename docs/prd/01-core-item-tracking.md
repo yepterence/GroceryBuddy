@@ -1,7 +1,7 @@
 # PRD 01 — Core Item Tracking
 
 > Status: Draft v0.1 · Goals: G1, G2 · Depends on: — · Index: [`README.md`](./README.md)
-> Portfolio v1: **BUILD** (foundation)
+> Portfolio v1: **BUILD**
 
 ---
 
@@ -53,10 +53,10 @@ Relational (Postgres). Extends today's `Item` / `GroceryList` shapes.
 ```
 user(id, ...)
 needed_item(id, user_id, list_id, name, checked, created_at)
-grocery_list(id, user_id, title)                       -- existing shape, persisted
-list_inclusion(id, user_id, item_name, list_id, included_at)   -- one row per add-to-list
-purchase_event(id, user_id, item_name, product_ref?, occurred_at)   -- optional (checkout)
-item_trend(item_name, user_id, inclusion_count, cadence_days, last_included_at, next_due_at)  -- derived
+grocery_list(id, user_id, title)
+list_inclusion(id, user_id, item_name, list_id, included_at)
+purchase_event(id, user_id, item_name, product_ref?, occurred_at) --optional
+item_trend(item_name, user_id, inclusion_count, cadence_days, last_included_at, next_due_at)
 ```
 
 Notes:
@@ -73,8 +73,8 @@ These are the first entries in the shared signal substrate (formalized in PRD 04
 
 ```
 needed_items:          [ { item_name, list_id, checked } ]
-list_inclusion_history: [ { item_name, list_id, included_at } ]   -- primary re-purchase signal
-purchase_history:      [ { item_name, occurred_at } ]            -- optional (checkout only)
+list_inclusion_history: [ { item_name, list_id, included_at } ]   -- primary
+purchase_history:      [ { item_name, occurred_at } ]            -- optional
 ```
 
 ## 7. Non-Functional

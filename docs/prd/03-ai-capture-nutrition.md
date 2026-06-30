@@ -88,7 +88,7 @@ log_entry(id, user_id, food_id, grams, nutrients_json, consumed_at)   -- the jou
 consent(id, user_id, scope, granted, updated_at)
 ```
 
-`correction` paired with `prediction` is the **training-grade record / data moat** — always
+`correction` paired with `prediction` is the **training-grade record** — always
 captured, never overwritten.
 
 ## 7. Signal Contracts (produced for later PRDs)
@@ -114,7 +114,7 @@ nutrition: { date, targets: {...}, consumed: {...}, gaps: {...} }
 ## 10. Open Questions / Risks
 
 - **Portion accuracy** dominates calorie error — how aggressive should the confirmation UX
-  be? (LiDAR/depth on capable phones later.)
+  be? weight/volume/size of food? 
 - Recognition provider: hosted food API vs vision LLM vs (later) own model — cost/latency
   tradeoff.
 - Recognition→`food_item` canonicalization (mapping free-text predictions to the reference

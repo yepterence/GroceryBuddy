@@ -8,8 +8,7 @@
 
 ## 1. Background & Problem
 
-This is the **first, concrete recommender**, built standalone and hardcoded — deliberately
-**not** generic. Its purpose is twofold:
+This is the **first, concrete recommender**, built standalone and hardcoded. Its purpose is twofold:
 
 1. Deliver real value (G3): suggest items the user should re-buy.
 2. Serve as the **reference implementation** that PRD 04 generalizes into a framework.

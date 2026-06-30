@@ -57,8 +57,8 @@ food_log:               [ { food_id, name, grams, consumed_at } ]
 nutrition:        { date, targets: {nutrient: amount}, consumed: {...}, gaps: {...} }
 location:         { lat, lng, postal_code }
 flyer_data:       [ { store, item, price, brand, valid_to } ]
-inventory:        [ { item_name, qty } ]        # later
-taste_profile:    { embedding: [...], liked: [...], disliked: [...] }   # later
+inventory:        [ { item_name, qty } ]        # implemented in later phases
+taste_profile:    { embedding: [...], liked: [...], disliked: [...] }   # implemented in later phases
 ```
 
 A signal registry validates shapes so a producer change can't silently break a recommender.
