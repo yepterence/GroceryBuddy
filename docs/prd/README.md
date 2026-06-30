@@ -44,9 +44,11 @@ Companion technical design: [`../modular-recommendations-design.md`](../modular-
 
 1. **01 first** — everything reads from the tracking data model; it defines the first
    signal schemas (`needed_items`, `food_log`, `purchase_history`).
-2. **02 next** — a standalone, hardcoded re-purchase recommender. It only needs tracking
-   data (not nutrition), so it ships early and de-risks the "recommendation" idea with a
-   real, narrow example.
+2. **02 next** — a standalone, hardcoded re-purchase recommender driven by **how often an
+   item has been included in a list**. This signal is produced by the core app from day
+   one (no nutrition, no checkout integration, no AI), so re-purchase is **vital, not
+   optional**: it's the most directly available unit of value and de-risks the
+   "recommendation" idea with a real, narrow example.
 3. **03 in parallel-ish** — the AI photo→nutrition loop (the headline augmentation).
    Mobile capture UX is folded in here because that is where "mobile" actually earns its
    keep (camera, latency, offline). Adds the `nutrition` signal.
@@ -77,12 +79,12 @@ apps (MyFitnessPal/Cronometer stop at the gap; Flipp/Reebee don't know nutrition
 
 | PRD / module | v1 status | Notes |
 |--------------|-----------|-------|
-| 01 Core item tracking | **Build** | Small foundation; needed-items + consumption history |
+| 01 Core item tracking | **Build** | Small foundation; needed-items + **list-inclusion history** |
+| 02 Re-purchase (M2) | **Build (vital)** | Driven by **list-inclusion frequency** the core app already produces; no AI/nutrition dependency |
 | 03 AI capture + nutrition | **Build (thin)** | Use a **vision LLM** (no model training); nutrition via Open Food Facts / USDA |
 | M1 flyer/price (existing scraper) | **Build (wrap)** | Already exists — wrap `api/scraper.py` |
 | M3 recipe/item by nutrient gap | **Build (thin)** | Just enough to close the loop to M1 |
-| 04 Framework contract + registry | **Build (minimal)** | Prove the plugin contract with **2 modules** (M1 + M3) |
-| 02 Re-purchase (M2) | **Optional** | Nice third module if time allows |
+| 04 Framework contract + registry | **Build (minimal)** | Prove the plugin contract with multiple modules (M1, M2, M3) |
 | M4 / M5 / M6 | **Design-only** | Documented as "designed, not built" + roadmap |
 | Data-moat machinery, custom model, native-mobile polish | **Out of scope** | Company concerns; in a portfolio they read as unfinished scope |
 

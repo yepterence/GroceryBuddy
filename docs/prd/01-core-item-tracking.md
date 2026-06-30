@@ -40,10 +40,11 @@ consumed*, plus the consumption trends derived from them.
 |----|-------------|------|
 | F1 | Create/edit/delete a **needed-items list**; check items off | G1 |
 | F2 | Multiple named lists per user (reuses existing `GroceryList` shape) | G1 |
-| F3 | Record a **purchase/consumption event** for an item (manual or from checking off) | G2 |
-| F4 | Maintain a **consumption history** per item (timestamps) | G2 |
-| F5 | Compute **trend signal** per item: frequency + recency + "due" estimate | G2 |
-| F6 | Expose tracking data as **signals** (`needed_items`, `purchase_history`) for later PRDs | G1, G2 |
+| F3 | Record a **list-inclusion event** every time an item is added to a list (timestamp) | G2 |
+| F4 | Maintain per-item **inclusion history + count** across lists/sessions | G2 |
+| F5 | (Optional) record a purchase/consumption event when checkout data exists | G2 |
+| F6 | Compute **trend signal** per item: inclusion frequency + recency + "due" estimate | G2 |
+| F7 | Expose tracking data as **signals** (`needed_items`, `list_inclusion_history`, optional `purchase_history`) for later PRDs | G1, G2 |
 
 ## 5. Data Model
 
@@ -53,12 +54,16 @@ Relational (Postgres). Extends today's `Item` / `GroceryList` shapes.
 user(id, ...)
 needed_item(id, user_id, list_id, name, checked, created_at)
 grocery_list(id, user_id, title)                       -- existing shape, persisted
-purchase_event(id, user_id, item_name, product_ref?, occurred_at)
-item_trend(item_name, user_id, frequency_days, last_occurred_at, next_due_at)  -- derived
+list_inclusion(id, user_id, item_name, list_id, included_at)   -- one row per add-to-list
+purchase_event(id, user_id, item_name, product_ref?, occurred_at)   -- optional (checkout)
+item_trend(item_name, user_id, inclusion_count, cadence_days, last_included_at, next_due_at)  -- derived
 ```
 
 Notes:
-- `purchase_event` is **immutable** truth; `item_trend` is **derived/recomputable**.
+- `list_inclusion` is the **primary, always-available** signal (the existing app produces
+  it). `purchase_event` is **optional enrichment** that only exists with checkout data.
+- `list_inclusion` and `purchase_event` are **immutable** truth; `item_trend` is
+  **derived/recomputable**.
 - `item_name` is the join key for now; a canonical product/food id can be introduced later
   (PRD 03/04) without breaking this model.
 
@@ -67,14 +72,15 @@ Notes:
 These are the first entries in the shared signal substrate (formalized in PRD 04):
 
 ```
-needed_items:     [ { item_name, list_id, checked } ]
-purchase_history: [ { item_name, occurred_at } ]
+needed_items:          [ { item_name, list_id, checked } ]
+list_inclusion_history: [ { item_name, list_id, included_at } ]   -- primary re-purchase signal
+purchase_history:      [ { item_name, occurred_at } ]            -- optional (checkout only)
 ```
 
 ## 7. Non-Functional
 
 - List reads/writes feel instant (<300ms perceived).
-- Trend computation runs incrementally on new purchase events (no full recompute per read).
+- Trend computation runs incrementally on new list inclusions (no full recompute per read).
 
 ## 8. Success Metrics
 
@@ -85,4 +91,6 @@ purchase_history: [ { item_name, occurred_at } ]
 
 - Canonical product identity: stay string-keyed (`item_name`) in v1, or introduce a
   product/food id now? (Leaning string-keyed for v1; revisit in PRD 03.)
-- Source of consumption events: only check-offs, or also receipt/cart integrations?
+- Inclusion definition: count an add-to-list, a check-off, or both as an inclusion event?
+  (v1: add-to-list.)
+- Optional purchase events: only if/when receipt/cart integrations exist.

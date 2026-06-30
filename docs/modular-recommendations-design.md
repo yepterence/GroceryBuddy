@@ -110,10 +110,11 @@ Normalized, read-only feature layer so modules don't re-derive data.
 
 | Signal key | Produced by | Consumed by |
 |------------|-------------|-------------|
-| `food_log` | capture loop | M2, M3, M6 |
+| `list_inclusion_history` | core tracking (add-to-list) | M2 |
+| `food_log` | capture loop | M3, M6 |
 | `nutrition` | nutrition mapping | M3 |
-| `needed_items` | shopping list | M1 |
-| `purchase_history` | list -> cart events | M2, M6 |
+| `needed_items` | shopping list | M1, M2 |
+| `purchase_history` | optional checkout events | M2 (enrichment), M6 |
 | `location` | user profile | M1 |
 | `flyer_data` | existing scraper | M1 |
 | `restaurant_visits` | user input / integrations | M6 |
@@ -136,12 +137,13 @@ Normalized, read-only feature layer so modules don't re-derive data.
   `/get-prices` endpoint as a `Recommender`. Mostly an adapter.
 - **payload**: `{ item, store, price, brand }`
 
-### M2 — Re-purchase from food eaten (trend spotting)
-- **consumes**: `food_log`, `purchase_history`
-- **logic**: detect items consumed/purchased on a cadence (frequency + recency); when an
-  item is "due," recommend re-purchase.
-- **payload**: `{ item, last_consumed, predicted_due_date }`
-- **reason**: "You buy oat milk ~weekly; last added 8 days ago."
+### M2 — Re-purchase from list-inclusion frequency (trend spotting)
+- **consumes**: `list_inclusion_history` (primary), `needed_items`; optional `purchase_history`
+- **logic**: count how often an item has been included in a list (`inclusion_count`) and
+  combine that habit strength with recency/cadence; when a frequently-included item is
+  "due," recommend re-purchase. Needs no checkout/nutrition data.
+- **payload**: `{ item, inclusion_count, last_included_at, next_due_at }`
+- **reason**: "You've added oat milk to a list 6x; last time 8 days ago."
 
 ### M3 — Recipe by nutrient need
 - **consumes**: `nutrition` (today's gaps), `inventory`

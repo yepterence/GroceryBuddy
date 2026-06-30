@@ -2,7 +2,7 @@
 
 > Status: Draft v0.1 · Goals: G5 · Depends on: PRD 01, 02, 03 · Index: [`README.md`](./README.md)
 > Technical companion: [`../modular-recommendations-design.md`](../modular-recommendations-design.md)
-> Portfolio v1: **BUILD (minimal)** — contract + registry proven with 2 modules (M1 + M3);
+> Portfolio v1: **BUILD (minimal)** — contract + registry proven with M1, M2, M3;
 > M4/M5/M6 are **design-only**
 
 ---
@@ -50,9 +50,10 @@ Each signal has a versioned, typed schema. Recommenders declare `consumes` and o
 those signals. Draft schemas (consolidated from PRD 01/03):
 
 ```
-needed_items:     [ { item_name, list_id, checked } ]
-purchase_history: [ { item_name, occurred_at } ]
-food_log:         [ { food_id, name, grams, consumed_at } ]
+needed_items:           [ { item_name, list_id, checked } ]
+list_inclusion_history: [ { item_name, list_id, included_at } ]   # primary re-purchase signal
+purchase_history:       [ { item_name, occurred_at } ]            # optional (checkout only)
+food_log:               [ { food_id, name, grams, consumed_at } ]
 nutrition:        { date, targets: {nutrient: amount}, consumed: {...}, gaps: {...} }
 location:         { lat, lng, postal_code }
 flyer_data:       [ { store, item, price, brand, valid_to } ]
