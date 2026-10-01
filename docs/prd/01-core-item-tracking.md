@@ -27,6 +27,9 @@ consumed*, plus the consumption trends derived from them.
 - Generating recommendations (PRD 02).
 - Photo capture / nutrition (PRD 03).
 - Any plugin/framework abstraction (PRD 04).
+- Price, store, or vendor preference on a list item. Flyer price and "which store covers most of the list" are M1, computed at request time from the existing scraper.
+- Quantity on a needed item. It does not feed G2 or the signals below.
+- Credentials. Phase 0 has an anonymous tenant id only. See [Production gate](#10-production-gate).
 
 ## 3. Users & Stories
 
@@ -48,24 +51,27 @@ consumed*, plus the consumption trends derived from them.
 
 ## 5. Data Model
 
-Relational (Postgres). Extends today's `Item` / `GroceryList` shapes.
+One Postgres database. DDL: [`db/schema.sql`](../../db/schema.sql), applied by [`scripts/create-tables.sh`](../../scripts/create-tables.sh).
 
 ```
-user(id, ...)
-needed_item(id, user_id, list_id, name, checked, created_at)
+user(id)   -- anonymous tenant key; no email, password, or session
 grocery_list(id, user_id, title)
+needed_item(id, user_id, list_id, name, checked, created_at)
 list_inclusion(id, user_id, item_name, list_id, included_at)
-purchase_event(id, user_id, item_name, product_ref?, occurred_at) --optional
-item_trend(item_name, user_id, inclusion_count, cadence_days, last_included_at, next_due_at)
+item_trend(user_id, item_name, inclusion_count, cadence_days, last_included_at, next_due_at)
 ```
+
+`purchase_event(id, user_id, item_name, product_ref?, occurred_at)` stays **out of this schema** until a receipt or checkout source exists.
 
 Notes:
-- `list_inclusion` is the **primary, always-available** signal (the existing app produces
-  it). `purchase_event` is **optional enrichment** that only exists with checkout data.
-- `list_inclusion` and `purchase_event` are **immutable** truth; `item_trend` is
-  **derived/recomputable**.
-- `item_name` is the join key for now; a canonical product/food id can be introduced later
-  (PRD 03/04) without breaking this model.
+
+- `user.id` is an unguessable id created on first visit and stored by the client. Every list and item read is filtered by it. It segregates tenants. It does not authenticate the caller. Sending the id is enough to read and write that user's rows.
+- **Acquired** is `needed_item.checked`. Checking an item off marks that row done. It does not write a `list_inclusion`.
+- `list_inclusion` is an append-only log written when an item is **added** to a list. `included_at` is that timestamp. These rows are the frequency tracker (F3, F4). "Placed in cart" in v1 means this add.
+- Deleting a list deletes its `needed_item` rows. Inclusion rows stay, with `list_id` set null, so counts survive across lists (F4).
+- `list_inclusion` is **immutable** truth. `item_trend` is a **derived, recomputable** cache, updated when a new inclusion lands, so a list read does not rescan history. `cadence_days` and `next_due_at` stay null until a second inclusion makes an interval possible.
+- `item_name` is the join key for now; a canonical product/food id can be introduced later (PRD 03/04) without breaking this model.
+- No price column and no vendor table. A Flipp price is a per-store, time-bounded observation. M1 ranks coverage from the scraper response at request time. An item with no flyer price does not count toward that store's coverage.
 
 ## 6. Signal Contracts (consumed by later PRDs)
 
@@ -76,6 +82,8 @@ needed_items:          [ { item_name, list_id, checked } ]
 list_inclusion_history: [ { item_name, list_id, included_at } ]   -- primary
 purchase_history:      [ { item_name, occurred_at } ]            -- optional
 ```
+
+Price and store never enter these contracts.
 
 ## 7. Non-Functional
 
@@ -89,8 +97,19 @@ purchase_history:      [ { item_name, occurred_at } ]            -- optional
 
 ## 9. Open Questions
 
-- Canonical product identity: stay string-keyed (`item_name`) in v1, or introduce a
-  product/food id now? (Leaning string-keyed for v1; revisit in PRD 03.)
-- Inclusion definition: count an add-to-list, a check-off, or both as an inclusion event?
-  (v1: add-to-list.)
+- Canonical product identity: stay string-keyed (`item_name`) in v1, or introduce a product/food id now? (Leaning string-keyed for v1; revisit in PRD 03.)
+- Inclusion definition: count an add-to-list, a check-off, or both as an inclusion event? (v1: add-to-list.)
 - Optional purchase events: only if/when receipt/cart integrations exist.
+- **Production blocker:** authentication (who is calling) and authorization (they may only touch their own `user_id`) must exist before the app is dockerized or treated as production. Phase 0 does not build this. See below.
+
+## 10. Production gate
+
+Phase 0 ships the anonymous `user.id` only. There is no password, email, or session table.
+
+Before Docker or any deployment treated as production:
+
+- Authentication must establish who is calling.
+- Authorization must allow a caller to touch only their own `user_id`.
+- The foreign keys stay. Production replaces "the client sends an id" with "a session proves this caller owns this id."
+
+This gate is also recorded in the [PRD index](./README.md).

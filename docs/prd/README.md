@@ -91,3 +91,9 @@ apps (MyFitnessPal/Cronometer stop at the gap; Flipp/Reebee don't know nutrition
 **Why design-only is fine (and good):** demonstrating an extensible design + a credible
 roadmap (M4–M6 as drop-in modules) is stronger portfolio signal than half-building six
 modules. The PRDs themselves are part of the deliverable.
+
+## Pre-production gate
+
+PRD 01 segregates lists with an anonymous `user.id` and stores no email, password, or session. That id is a tenant key: whoever can send it can read and write those rows.
+
+**Blocker:** authentication (who is calling) and authorization (a caller may only touch their own `user_id`) must exist before this app is dockerized or treated as production. The `user_id` foreign keys stay. Production replaces "the client sends an id" with "a session proves this caller owns this id." See [PRD 01 §10](./01-core-item-tracking.md#10-production-gate).
