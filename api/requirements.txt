@@ -17,3 +17,4 @@ ujson==5.10.0
 urllib3==2.3.0
 uvloop==0.21.0
 websockets==14.2
+asyncpg==0.30.0
