@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
+import asyncio
 import uuid
 
+import asyncpg
 from sanic import Sanic
 from sanic import Blueprint
 from sanic.response import json
@@ -30,6 +32,27 @@ async def get_flyer_prices(request):
 
 def _error(message, status=400):
     return json({"status": "error", "message": message}, status=status)
+
+
+# Database unreachable or too slow (timeouts, refused/reset connections, closed pool).
+# OSError already covers TimeoutError/ConnectionError; asyncio.TimeoutError is a
+# separate class before Python 3.11 and an alias after, so de-duplicate.
+DB_UNAVAILABLE_ERRORS = tuple(
+    dict.fromkeys(
+        (
+            asyncio.TimeoutError,
+            OSError,
+            asyncpg.PostgresConnectionError,
+            asyncpg.CannotConnectNowError,  # Postgres still starting up (e.g. fresh container)
+            asyncpg.InterfaceError,
+        )
+    )
+)
+
+
+@app.exception(*DB_UNAVAILABLE_ERRORS)
+async def handle_db_unavailable(request, exception):
+    return _error("database unavailable, try again shortly", 503)
 
 
 def _parse_uuid(value):

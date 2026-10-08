@@ -11,13 +11,28 @@ import asyncpg
 _pool = None
 
 
+def _env_float(name, default):
+    try:
+        return float(os.environ.get(name, default))
+    except ValueError:
+        return float(default)
+
+
 async def init_pool(app=None, loop=None):
     global _pool
     if _pool is None:
         dsn = os.environ.get("DATABASE_URL")
         if not dsn:
             raise RuntimeError("DATABASE_URL is required (postgres connection string).")
-        _pool = await asyncpg.create_pool(dsn, min_size=1, max_size=10)
+        # Bounded timeouts so an unreachable/stalled DB (e.g. a stopped or
+        # unhealthy container) fails fast instead of hanging requests.
+        _pool = await asyncpg.create_pool(
+            dsn,
+            min_size=1,
+            max_size=10,
+            timeout=_env_float("DB_CONNECT_TIMEOUT", 10),
+            command_timeout=_env_float("DB_COMMAND_TIMEOUT", 30),
+        )
 
 
 async def close_pool(app=None, loop=None):

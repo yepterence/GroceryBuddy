@@ -1,0 +1,6 @@
+-r requirements.txt
+pytest
+pytest-asyncio
+sanic-testing
+# tracerite (pinned in requirements.txt) imports pkg_resources, removed from Python 3.12+ venvs
+setuptools<81
