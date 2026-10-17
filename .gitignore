@@ -28,6 +28,7 @@ __pycache__/
 
 # env
 gb-api/
+.env*
 
 # Projectdata
 data/
