@@ -1,0 +1,52 @@
+# Local Postgres for GroceryBuddy.
+#
+#   App/dev database (persistent):   docker compose up -d --wait postgres
+#   Throwaway test database:         docker compose --profile test up -d --wait postgres-test
+#
+# Setup: cp .env.example .env, then set POSTGRES_PASSWORD. Compose refuses to
+# start without it (no default password). Compose checks this for the whole
+# file, so .env is needed even when starting only the test service.
+
+services:
+  # Application database. Data survives restarts in the named volume.
+  # db/schema.sql is applied automatically the FIRST time the volume is created
+  # (idempotent, so it is also safe if you re-run scripts/create-tables.sh).
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-grocerybuddy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?password not set}
+      POSTGRES_DB: ${POSTGRES_DB:-grocerybuddy}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # Test database. Data lives in RAM and is discarded on every restart.
+  # The test suite applies db/schema.sql itself (tests/conftest.py).
+  postgres-test:
+    profiles: ["test"]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: grocerybuddy
+      POSTGRES_PASSWORD: grocerybuddy_test
+      POSTGRES_DB: grocerybuddy_test
+    ports:
+      - "127.0.0.1:5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U grocerybuddy -d grocerybuddy_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  pgdata:

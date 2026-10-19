@@ -1,0 +1,50 @@
+---
+description: Log the current coding session into devlog/events.csv and devlog/features.csv. Use when the user says "/log", "log this session", or "update the devlog".
+alwaysApply: false
+---
+
+# Devlog: turn this conversation into log rows
+
+The user is measuring how fast they can build with AI **while still understanding the code**.
+Your job is to extract what happened in this chat session and append it to the log. Be accurate
+and honest, including about your own mistakes. An inflated log is useless to them.
+
+## Files
+- `devlog/events.csv` — one row per event. Append only. Never edit or reorder existing rows.
+- `devlog/features.csv` — one row per feature. You may update `actual_sessions`, `end_date`,
+  `status` and `notes` on the current feature's row.
+
+## Steps
+1. Read both CSVs. Find the current feature (status `in_progress`) and the last `session` id.
+   Use the next session id (S01 → S02) unless the user says this is the same session.
+2. Review the whole conversation and list the events (see types below). Split a long stretch
+   into separate rows when the area or type changes.
+3. Estimate `minutes` for each event from the conversation's timestamps or the user's words.
+   If you are guessing, append ` (est)` to the description. If the total is unclear, ask the
+   user one question: "Roughly how long was this session?" and scale your estimates to it.
+4. Show the rows you plan to add as a markdown table and wait for the user to confirm or correct.
+5. On confirmation, append the rows to `events.csv` with proper CSV quoting (wrap descriptions
+   in double quotes, escape internal quotes as ""). Then update `features.csv` if needed.
+6. Finish with a 3-line recap: minutes building vs verifying this session, AI errors caught,
+   and anything marked `understood=no` (that is the user's study list).
+
+## Columns in events.csv
+| column | allowed values |
+|---|---|
+| date | YYYY-MM-DD |
+| session | S01, S02, ... |
+| feature_id | matches features.csv, e.g. F01 |
+| event_type | `build` (writing or generating code), `verify` (reading or checking code to trust it), `debug` (fixing something broken), `learn` (studying a concept), `decision` (a design choice and why), `ai_error` (the AI produced something wrong), `blocked` (stuck and waiting/searching) |
+| area | `schema`, `api`, `ui`, `tests`, `bash`, `config`, `deploy`, `auth`, `other` |
+| minutes | whole number |
+| description | one plain sentence; for `decision`, include the reason; for `ai_error`, say what was wrong |
+| ai_role | `none` (user did it), `explain` (AI explained), `generate` (AI wrote it), `review` (AI reviewed user's code) |
+| understood | `yes`, `partial`, `no` — can the user explain this code or concept now? Ask if unsure; never assume `yes` |
+| source | where the user went to verify: `docs`, `stackoverflow`, `ai_explain`, `tests`, or blank |
+| caught_by | only for `ai_error`: `me_reading`, `tests`, `runtime`, `later` |
+| enjoyment | 1 (slog), 2 (fine), 3 (lost track of time) — ask the user at the end; leave blank if not given |
+
+## Rules
+- Log every `ai_error`, including mistakes you made in this conversation. Do not soften them.
+- Do not invent work that did not happen in the conversation.
+- Keep descriptions short and specific ("Missing index on items.list_id"), not vague ("fixed stuff").
