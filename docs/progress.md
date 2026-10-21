@@ -1,6 +1,6 @@
 # Project Progress
 
-Last updated: 2026-10-16. Scope and sequencing live in [`prd/README.md`](./prd/README.md);
+Last updated: 2026-10-20. Scope and sequencing live in [`prd/README.md`](./prd/README.md);
 this file tracks what is actually done. Status key: ✅ done · 🟡 partial / unverified · ⬜ not started.
 
 ## Summary
@@ -11,8 +11,8 @@ this file tracks what is actually done. Status key: ✅ done · 🟡 partial / u
 | Postgres schema (PRD 01) | ✅ | `db/schema.sql`, idempotent |
 | List persistence API (PRD 01) | ✅ | CRUD routes + `api/db.py` |
 | Database in Docker | ✅ | `docker-compose.yml` (app + test services) |
-| Automated tests | 🟡 | Written; **not yet run against a real Postgres** |
-| Frontend ↔ API integration | ⬜ | No calls to the list API from `src/` yet |
+| Automated tests | ✅ | Run against a real Postgres (`./scripts/test.sh`); confirmed by the maintainer on 2026-10-20 |
+| Frontend ↔ API integration | 🟡 | `src/requests.ts` wired into the create form and dashboard; unit-tested with mocked `fetch`, **not yet tried in a browser against the live API** |
 | Re-purchase recommender (PRD 02) | ⬜ | Needs `item_trend` computation |
 | AI capture + nutrition (PRD 03) | ⬜ | |
 | Recommendation framework (PRD 04) | ⬜ | |
@@ -48,19 +48,14 @@ this file tracks what is actually done. Status key: ✅ done · 🟡 partial / u
 
 ## In progress / needs verification
 
-- [ ] **Run the DB-backed tests for real.** 45 pass without a database; the other 46 are skipped until `TEST_DATABASE_URL` is set. They have never been executed.
-  ```bash
-  docker compose --profile test up -d --wait postgres-test
-  cd api && TEST_DATABASE_URL=postgresql://grocerybuddy:grocerybuddy_test@127.0.0.1:5433/grocerybuddy_test \
-    ../gb-api/bin/python -m pytest
-  ```
+- [x] **DB-backed tests run against a real Postgres** (2026-10-20, confirmed by the maintainer). Run them with `./scripts/test.sh`; without `TEST_DATABASE_URL` the database tests are skipped.
 - [ ] Run `scripts/create-tables.sh` twice against the app container to confirm it is re-runnable
 - [ ] Verify the real unreachable-host timeout (the check passed in a sandbox where the failure may have been immediate)
 
 ## Next up
 
 - [ ] Load `.env` in the API (`python-dotenv`; `DATABASE_URL` is currently only read from the process environment)
-- [ ] Connect the React frontend (`src/`) to the list API (no `fetch` calls exist yet)
+- [x] Connect the React frontend (`src/`) to the list API (`requests.ts`; create, load, check, delete). Still to do: try it end to end in a browser, and add UI for adding an item to an existing list (`addItem` exists but no component uses it)
 - [ ] Update `item_trend` from `list_inclusion` (cadence, `next_due_at`); prerequisite for PRD 02
 - [ ] PRD 02: re-purchase recommender
 - [ ] PRD 03: AI capture and nutrition (thin)

@@ -5,6 +5,7 @@ import { GroceryList } from "../types";
 interface ListStore {
   groceryLists: GroceryList[];
   addGroceryList: (groceryList: GroceryList) => void;
+  setGroceryLists: (groceryLists: GroceryList[]) => void;
   toggleItemChecked: (listId: string, itemId: string) => void;
   updateListTitle: (listId: string, title: string) => void;
   removeItem: (listId: string, itemId: string) => void;
@@ -17,6 +18,9 @@ const store: StateCreator<ListStore> = (set) => ({
     set((state) => ({
       groceryLists: [...state.groceryLists, groceryList],
     }));
+  },
+  setGroceryLists: (groceryLists) => {
+    set({ groceryLists });
   },
   toggleItemChecked: (listId: string, itemId: string) => {
     set((state) => ({
