@@ -38,7 +38,7 @@ else
   py="$root/gb-api/bin/python"
   [[ -x "$py" ]] || die "No Python environment found. Run: python3 -m venv gb-api && gb-api/bin/pip install -r api/requirements-dev.txt"
 fi
-"$py" -c "import pytest, pytest_asyncio, sanic_testing, asyncpg" 2>/dev/null \
+"$py" -c "import pytest, pytest_asyncio, sanic_testing, asyncpg, dotenv" 2>/dev/null \
   || die "Test dependencies missing. Run: pip install -r api/requirements-dev.txt"
 
 # --- Test database ---------------------------------------------------------
@@ -68,7 +68,7 @@ fi
 
 # --- Run -------------------------------------------------------------------
 status=0
-(cd api && "$py" -m pytest ${pytest_args[@]+"${pytest_args[@]}"}) || status=$?
+(cd api && "$py" -m pytest -rs --no-fold-skipped ${pytest_args[@]+"${pytest_args[@]}"}) || status=$?
 
 if [[ "$stop_after" -eq 1 && "$TEST_DATABASE_URL" == "$DEFAULT_TEST_URL" ]]; then
   echo "Stopping postgres-test..."

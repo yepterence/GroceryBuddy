@@ -4,9 +4,14 @@ All queries are scoped by user_id, the anonymous tenant key. Requires DATABASE_U
 """
 
 import os
+import pathlib
 import uuid
 
 import asyncpg
+from dotenv import load_dotenv
+
+DOTENV_PATH = pathlib.Path(__file__).resolve().parents[1] / ".env"
+load_dotenv(DOTENV_PATH)
 
 _pool = None
 
@@ -21,6 +26,7 @@ def _env_float(name, default):
 async def init_pool(app=None, loop=None):
     global _pool
     if _pool is None:
+        load_dotenv(DOTENV_PATH)
         dsn = os.environ.get("DATABASE_URL")
         if not dsn:
             raise RuntimeError("DATABASE_URL is required (postgres connection string).")

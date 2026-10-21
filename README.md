@@ -66,8 +66,8 @@ automatically. Data persists across restarts in the `pgdata` volume.
 ### 3. Run the API
 
 ```bash
-python3 -m venv gb-api            # gb-api/ is gitignored
-source gb-api/bin/activate
+python3 -m venv venv
+source venv/bin/activate
 pip install -r api/requirements-dev.txt   # runtime + test dependencies
 
 set -a; source .env; set +a       # the API reads DATABASE_URL from the environment
@@ -132,7 +132,7 @@ equals your `DATABASE_URL`. The manual equivalent:
 ```bash
 docker compose --profile test up -d --wait postgres-test
 
-source gb-api/bin/activate
+source venv/bin/activate
 cd api
 TEST_DATABASE_URL=postgresql://grocerybuddy:grocerybuddy_test@127.0.0.1:5433/grocerybuddy_test \
   python -m pytest
