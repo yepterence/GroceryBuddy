@@ -4,7 +4,7 @@ Your grocery list, on your side. Grocery Buddy checks local flyers for sales on 
 
 Where it’s headed: snap a photo of what you ate to log its nutrition, suggest recipes that fill nutrient gaps, and recommend re-purchases based on what you buy regularly. The goal is to link nutrition to local prices, which nutrition apps and flyer apps each stop short of. See the [product specs](docs/prd/README.md).
 
-Status: the list API, flyer price lookup and Postgres schema are built, and a test suite is written; the database tests have not yet been run against a real Postgres. Connecting the frontend to the API and building the recommenders come next. See [`docs/progress.md`](docs/progress.md) for details.
+Status: the list API, flyer price lookup and Postgres schema are built, and a test suite covers the API against a real Postgres. Connecting the frontend to the API and building the recommenders come next. See [`docs/progress.md`](docs/progress.md) for details.
 
 ## Local development
 
@@ -105,8 +105,10 @@ npm install
 npm run dev
 ```
 
-Vite serves the app at <http://localhost:5173>. Note: the frontend does not call the list
-API yet (see `docs/progress.md`).
+Vite serves the app at <http://localhost:5173>. Requests to `/api/*` are proxied to the
+API on port 3001 (see `vite.config.ts`), so start the API too or saving lists will show an
+error. Set `VITE_API_URL` to call a different API address directly. The frontend tests run
+with `npm test`; they mock the network and need neither the API nor Postgres.
 
 ## Tests
 

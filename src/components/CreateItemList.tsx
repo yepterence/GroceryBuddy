@@ -2,12 +2,16 @@ import { SetStateAction, useState, useRef, KeyboardEvent } from "react";
 import { useListStore } from "../store/applicationStore";
 import { v4 as uuidv4 } from "uuid";
 import { Item } from "../types";
+import { createList } from "../requests";
+import Banner from "./Banner";
 
 const CreateItemList = () => {
   const addGroceryList = useListStore((state) => state.addGroceryList);
   const [title, setTitle] = useState("");
   const [newItem, setNewItem] = useState<string>("");
   const [items, setItems] = useState<Item[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const nextInputRef = useRef<HTMLInputElement>(null);
 
   const handleTitleChange = (e: {
@@ -49,16 +53,29 @@ const CreateItemList = () => {
     }
   };
 
-  const handleFormSubmit = (e: { preventDefault: () => void }) => {
+  // Save to the API first; the store gets the server's list (with its real ids),
+  // and the form is only cleared once the save succeeded.
+  const handleFormSubmit = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
-    const listId = uuidv4();
-    const payload = { id: listId, title: title, contents: items };
-    addGroceryList(payload);
-    setTitle("");
-    setItems([]);
+    setError(null);
+    setSaving(true);
+    try {
+      const saved = await createList(
+        title,
+        items.map((item) => item.name),
+      );
+      addGroceryList(saved);
+      setTitle("");
+      setItems([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the list.");
+    } finally {
+      setSaving(false);
+    }
   };
   return (
     <div>
+      <Banner type="error" message={error} onDismiss={() => setError(null)} />
       <form>
         <input
           type="text"
@@ -91,7 +108,7 @@ const CreateItemList = () => {
           onKeyDown={handleKeyDown}
           ref={nextInputRef}
         />
-        <button type="submit" onClick={handleFormSubmit}>
+        <button type="submit" onClick={handleFormSubmit} disabled={saving}>
           Add
         </button>
       </form>

@@ -61,3 +61,50 @@ form button {
     text-decoration: line-through; 
     list-style: none;
 }
+
+.banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 600px;
+    max-width: 100%;
+    margin: 16px auto 0 auto;
+    padding: 10px 14px;
+    border: 1px solid;
+    border-radius: 7px;
+    font-size: 0.95rem;
+}
+
+.banner-error {
+    background: #fdecea;
+    border-color: #f5c2c0;
+    color: #8a1f1b;
+}
+
+.banner-warning {
+    background: #fff4e5;
+    border-color: #ffd699;
+    color: #7a4b00;
+}
+
+.banner-info {
+    background: #e8f4fd;
+    border-color: #b6dcf5;
+    color: #0b4a73;
+}
+
+.banner-success {
+    background: #e9f7ec;
+    border-color: #b8e2c0;
+    color: #1d5e2b;
+}
+
+.banner .banner-dismiss {
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+}
