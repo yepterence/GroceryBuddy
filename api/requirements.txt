@@ -18,3 +18,4 @@ urllib3==2.3.0
 uvloop==0.21.0
 websockets==14.2
 asyncpg==0.30.0
+python-dotenv==1.2.4

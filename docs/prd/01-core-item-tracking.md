@@ -69,7 +69,7 @@ Notes:
 - **Acquired** is `needed_item.checked`. Checking an item off marks that row done. It does not write a `list_inclusion`.
 - `list_inclusion` is an append-only log written when an item is **added** to a list. `included_at` is that timestamp. These rows are the frequency tracker (F3, F4). "Placed in cart" in v1 means this add.
 - Deleting a list deletes its `needed_item` rows. Inclusion rows stay, with `list_id` set null, so counts survive across lists (F4).
-- `list_inclusion` is **immutable** truth. `item_trend` is a **derived, recomputable** cache, updated when a new inclusion lands, so a list read does not rescan history. `cadence_days` and `next_due_at` stay null until a second inclusion makes an interval possible.
+- `list_inclusion` is **immutable** truth. `item_trend` is a **derived, recomputable** cache, updated when a new inclusion lands, so a list read does not rescan history. `cadence_days` and `next_due_at` stay null until a second inclusion makes an interval possible. Same-day additions of the same item (even across multiple lists) are collapsed into a single daily inclusion when computing `item_trend` so same-day additions do not skew `cadence_days` toward zero (see [`../tradeoffs.md`](../tradeoffs.md)).
 - `item_name` is the join key for now; a canonical product/food id can be introduced later (PRD 03/04) without breaking this model.
 - No price column and no vendor table. A Flipp price is a per-store, time-bounded observation. M1 ranks coverage from the scraper response at request time. An item with no flyer price does not count toward that store's coverage.
 

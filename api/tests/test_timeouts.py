@@ -107,6 +107,26 @@ def test_timeout_env_vars_fall_back_to_defaults_on_garbage(monkeypatch):
     assert db._env_float("DB_COMMAND_TIMEOUT", 30) == 2.5
 
 
+@NO_DB
+async def test_init_pool_loads_database_url_from_dotenv(monkeypatch, tmp_path):
+    dotenv_file = tmp_path / ".env"
+    dotenv_file.write_text("DATABASE_URL=postgresql://from-dotenv:5432/db\n")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setattr(db, "DOTENV_PATH", dotenv_file)
+
+    captured = {}
+
+    async def fake_create_pool(dsn, **kwargs):
+        captured["dsn"] = dsn
+        return object()
+
+    monkeypatch.setattr(asyncpg, "create_pool", fake_create_pool)
+    monkeypatch.setattr(db, "_pool", None)
+
+    await db.init_pool()
+    assert captured["dsn"] == "postgresql://from-dotenv:5432/db"
+
+
 async def test_slow_query_hits_command_timeout(monkeypatch):
     """A query that stalls (e.g. packets dropped mid-flight) is cut off, not hung."""
     from conftest import TEST_DATABASE_URL

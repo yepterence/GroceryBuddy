@@ -4,9 +4,16 @@ All queries are scoped by user_id, the anonymous tenant key. Requires DATABASE_U
 """
 
 import os
+import pathlib
 import uuid
 
 import asyncpg
+from dotenv import load_dotenv
+
+from trends import Trend
+
+DOTENV_PATH = pathlib.Path(__file__).resolve().parents[1] / ".env"
+load_dotenv(DOTENV_PATH)
 
 _pool = None
 
@@ -21,6 +28,7 @@ def _env_float(name, default):
 async def init_pool(app=None, loop=None):
     global _pool
     if _pool is None:
+        load_dotenv(DOTENV_PATH)
         dsn = os.environ.get("DATABASE_URL")
         if not dsn:
             raise RuntimeError("DATABASE_URL is required (postgres connection string).")
@@ -57,10 +65,61 @@ def _item_row(r):
     }
 
 
+def _trend_row(r):
+    return {
+        "item_name": r["item_name"],
+        "inclusion_count": r["inclusion_count"],
+        "cadence_days": float(r["cadence_days"]) if r["cadence_days"] is not None else None,
+        "last_included_at": r["last_included_at"].isoformat(),
+        "next_due_at": r["next_due_at"].isoformat() if r["next_due_at"] is not None else None,
+    }
+
+
+async def _update_item_trend_on_conn(conn, user_id, item_name):
+    rows = await conn.fetch(
+        "SELECT included_at FROM list_inclusion "
+        "WHERE user_id = $1 AND item_name = $2 "
+        "ORDER BY included_at ASC",
+        user_id,
+        item_name,
+    )
+    if not rows:
+        return None
+    trend = Trend.from_inclusions(item_name, [r["included_at"] for r in rows])
+    saved = await conn.fetchrow(
+        "INSERT INTO item_trend ("
+        "    user_id, item_name, inclusion_count, cadence_days, last_included_at, next_due_at"
+        ") VALUES ($1, $2, $3, $4, $5, $6) "
+        "ON CONFLICT (user_id, item_name) DO UPDATE SET "
+        "    inclusion_count = EXCLUDED.inclusion_count, "
+        "    cadence_days = EXCLUDED.cadence_days, "
+        "    last_included_at = EXCLUDED.last_included_at, "
+        "    next_due_at = EXCLUDED.next_due_at "
+        "RETURNING item_name, inclusion_count, cadence_days, last_included_at, next_due_at",
+        user_id,
+        item_name,
+        trend.inclusion_count,
+        trend.cadence_days,
+        trend.last_included_at,
+        trend.next_due_at,
+    )
+    return _trend_row(saved)
+
+
+async def update_item_trend(user_id, item_name, conn=None):
+    """Recompute and upsert `item_trend` for `(user_id, item_name)` from `list_inclusion`."""
+    if conn is not None:
+        return await _update_item_trend_on_conn(conn, user_id, item_name)
+    async with _get_pool().acquire() as acquired:
+        async with acquired.transaction():
+            return await _update_item_trend_on_conn(acquired, user_id, item_name)
+
+
 async def create_list(user_id, title, item_names):
     """Create a list with its items in one transaction.
 
-    Also ensures the user exists and appends a list_inclusion row per item.
+    Also ensures the user exists, appends a list_inclusion row per item,
+    and updates item_trend.
     """
     list_id = uuid.uuid4()
     items = []
@@ -84,6 +143,7 @@ async def create_list(user_id, title, item_names):
                     "VALUES ($1, $2, $3, $4)",
                     uuid.uuid4(), user_id, name, list_id,
                 )
+                await update_item_trend(user_id, name, conn=conn)
                 items.append(_item_row(row))
     return {"id": str(list_id), "user_id": str(user_id), "title": title, "items": items}
 
@@ -144,6 +204,7 @@ async def add_item(user_id, list_id, name):
                 "VALUES ($1, $2, $3, $4)",
                 uuid.uuid4(), user_id, name, list_id,
             )
+            await update_item_trend(user_id, name, conn=conn)
     return _item_row(row)
 
 

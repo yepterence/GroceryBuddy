@@ -31,7 +31,7 @@ interface ApiList {
 }
 
 /**
- * There is no login yet: the API scopes every row by an anonymous user id, so this
+ * Needs login. The API scopes every row by an anonymous user id, so the
  * browser generates one on first use and keeps it. Clearing site data creates a new
  * (empty) user. Real auth must replace this before production.
  */

@@ -5,6 +5,7 @@ list_inclusion history, transaction rollback and ON DELETE rules.
 """
 
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -19,6 +20,14 @@ def uid():
 async def inclusions(pool, uid):
     return await pool.fetch(
         "SELECT item_name, list_id FROM list_inclusion WHERE user_id = $1 ORDER BY included_at",
+        uid,
+    )
+
+
+async def trends(pool, uid):
+    return await pool.fetch(
+        "SELECT item_name, inclusion_count, cadence_days, last_included_at, next_due_at "
+        "FROM item_trend WHERE user_id = $1 ORDER BY item_name",
         uid,
     )
 
@@ -51,6 +60,7 @@ async def test_create_list_rolls_back_everything_on_failure(pool, uid):
     assert await pool.fetchval("SELECT count(*) FROM grocery_list WHERE user_id = $1", uid) == 0
     assert await pool.fetchval("SELECT count(*) FROM needed_item WHERE user_id = $1", uid) == 0
     assert await inclusions(pool, uid) == []
+    assert await trends(pool, uid) == []
 
 
 async def test_get_lists_and_get_list_are_scoped_to_user(pool, uid):
@@ -116,3 +126,43 @@ async def test_delete_list_returns_false_when_missing_or_foreign(pool, uid):
     assert await db.delete_list(uuid.uuid4(), list_id) is False
     assert await db.delete_list(uid, uuid.uuid4()) is False
     assert await db.get_list(uid, list_id) is not None
+
+
+async def test_create_list_and_add_item_populate_item_trend_with_same_day_dedup(pool, uid):
+    created = await db.create_list(uid, "Weekly", ["milk", "eggs"])
+    list_id = uuid.UUID(created["id"])
+
+    # Adding milk again on the same day appends to list_inclusion, but keeps
+    # item_trend at 1 daily inclusion with null cadence.
+    await db.add_item(uid, list_id, "milk")
+
+    inc_rows = await inclusions(pool, uid)
+    assert [r["item_name"] for r in inc_rows] == ["milk", "eggs", "milk"]
+
+    trend_rows = {r["item_name"]: r for r in await trends(pool, uid)}
+    assert set(trend_rows) == {"milk", "eggs"}
+    assert trend_rows["milk"]["inclusion_count"] == 1
+    assert trend_rows["milk"]["cadence_days"] is None
+    assert trend_rows["milk"]["next_due_at"] is None
+
+
+async def test_update_item_trend_computes_median_cadence_and_next_due_across_days(pool, uid):
+    await db.create_list(uid, "Seed", [])
+    t0 = datetime(2026, 10, 1, 9, 0, tzinfo=timezone.utc)
+    # Intervals: 7d, 7d, 28d (outlier), 7d -> median 7d
+    for offset in (0, 7, 14, 42, 49):
+        await pool.execute(
+            "INSERT INTO list_inclusion (id, user_id, item_name, included_at) "
+            "VALUES ($1, $2, $3, $4)",
+            uuid.uuid4(),
+            uid,
+            "oat milk",
+            t0 + timedelta(days=offset),
+        )
+
+    result = await db.update_item_trend(uid, "oat milk")
+    assert result["item_name"] == "oat milk"
+    assert result["inclusion_count"] == 5
+    assert result["cadence_days"] == pytest.approx(7.0)
+    assert result["last_included_at"] == (t0 + timedelta(days=49)).isoformat()
+    assert result["next_due_at"] == (t0 + timedelta(days=56)).isoformat()
