@@ -1,6 +1,6 @@
 # Project Progress
 
-Last updated: 2026-10-21. Scope and sequencing live in [`prd/README.md`](./prd/README.md);
+Last updated: 2026-10-28. Scope and sequencing live in [`prd/README.md`](./prd/README.md);
 this file tracks what is actually done. Status key: ✅ done · 🟡 partial / unverified · ⬜ not started.
 
 ## Summary
@@ -56,10 +56,22 @@ this file tracks what is actually done. Status key: ✅ done · 🟡 partial / u
 
 - [x] Load `.env` in the API (`python-dotenv` in `api/db.py`)
 - [x] Connect the React frontend (`src/`) to the list API (`requests.ts`; create, load, check, delete). Still to do: try it end to end in a browser, and add UI for adding an item to an existing list (`addItem` exists but no component uses it)
-- [ ] Update `item_trend` from `list_inclusion` (cadence, `next_due_at`); prerequisite for PRD 02
+- [x] Update `item_trend` from `list_inclusion` (`api/trends.py` + `db.update_item_trend`: median `cadence_days`, `next_due_at`, same-day deduplication, and frequency + recency `calculate_score`; trade-offs documented in `docs/tradeoffs.md`)
 - [ ] PRD 02: re-purchase recommender
 - [ ] PRD 03: AI capture and nutrition (thin)
 - [ ] PRD 04: minimal framework contract + registry, wrapping `api/scraper.py` as M1
+
+## Polish (UI / CSS)
+
+Product feel and layout in `src/styles/theme.css` and list components (`GroceryDashboard`, etc.). Can ship incrementally alongside feature work.
+
+- [ ] **List delete as an “×” control** — Replace the text “Delete” button with a compact dismiss control (match `Banner` dismiss styling where it fits). Position it in the list header row (title left, × right) so lists read as cards, not title + stray button.
+- [ ] **Per-item remove** — Add an × on each line next to the checkbox and label; wire to store + API. Today the API has no `DELETE /items/<id>` (only PATCH check and list delete); add backend + `requests.ts` if needed, then style the row as a flex line (checkbox · name · remove).
+- [ ] **Visual theme (“Sunday market”)** — Warm, personable grocery-app look (extend/replace the current generic sans + `#6CBDE9` blocks in `theme.css`):
+  - **Palette:** page `#faf6f0` (cream), surface/cards `#fff` with soft shadow, text `#2c2825`, muted `#6b6560`, primary `#3d7a5f` (sage), accent/hover `#c4713a` (terracotta), error/success aligned with existing banner hues.
+  - **Type:** one friendly rounded sans (e.g. **Nunito** or **DM Sans** via Google Fonts) for headings and UI; slightly larger list titles.
+  - **Layout:** max-width column (~640px), list blocks as rounded cards with padding; checkbox + item + × on one row with comfortable tap targets on mobile.
+  - **Tone:** light header bar or subtle top stripe in sage; optional small emoji or wordmark in `Header` (“Grocery Buddy”) — keep it subtle, not clip-art heavy.
 
 ## Known gaps and risks
 

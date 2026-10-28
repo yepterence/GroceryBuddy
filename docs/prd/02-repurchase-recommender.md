@@ -52,8 +52,7 @@ checkout data exists.
 included in a list (`inclusion_count`) and the distinct list/sessions it appeared in. This
 count is the core driver: items added repeatedly are habitual re-purchases.
 
-**Step 2 — cadence (recency-aware).** From the inclusion timestamps, compute the median
-interval between inclusions, `cadence_days`, and `days_since = now - last_included_at`.
+**Step 2 — cadence (recency-aware).** From the inclusion timestamps (deduplicated to one inclusion per UTC calendar day so adding the same item to multiple lists on the same day counts as a single addition; see [`../tradeoffs.md`](../tradeoffs.md)), compute the median interval between inclusions, `cadence_days`, and `days_since = now - last_included_at`.
 (With only one inclusion, cadence is undefined — see eligibility.)
 
 **Step 3 — score.** Combine *habit strength* (frequency) with *due-ness* (recency):
