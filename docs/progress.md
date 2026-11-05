@@ -56,8 +56,9 @@ this file tracks what is actually done. Status key: ✅ done · 🟡 partial / u
 
 - [x] Load `.env` in the API (`python-dotenv` in `api/db.py`)
 - [x] Connect the React frontend (`src/`) to the list API (`requests.ts`; create, load, check, delete). Still to do: try it end to end in a browser, and add UI for adding an item to an existing list (`addItem` exists but no component uses it)
-- [x] Update `item_trend` from `list_inclusion` (`api/trends.py` + `db.update_item_trend`: median `cadence_days`, `next_due_at`, same-day deduplication, and frequency + recency `calculate_score`; trade-offs documented in `docs/tradeoffs.md`)
+- [x] Update `item_trend` from `list_inclusion` (`api/trends.py` + `db.update_item_trend`: median `cadence_days`, `next_due_at`, 12-hour session deduplication, `inclusion_count >= 2` eligibility, and frequency + recency `calculate_score`; trade-offs documented in `docs/tradeoffs.md`)
 - [ ] PRD 02: re-purchase recommender
+- [ ] Decide on duplicate, source and list-purpose signals for inclusions (design in `docs/tradeoffs.md` section 3)
 - [ ] PRD 03: AI capture and nutrition (thin)
 - [ ] PRD 04: minimal framework contract + registry, wrapping `api/scraper.py` as M1
 

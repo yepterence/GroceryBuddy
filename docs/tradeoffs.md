@@ -1,6 +1,6 @@
 # Architecture & Implementation Trade-offs
 
-Last updated: 2026-10-28.
+Last updated: 2026-10-30.
 
 This document captures deliberate engineering trade-offs made while building GroceryBuddy, why a given option was chosen for the current stage, and what to revisit as usage or scale grows.
 
@@ -33,16 +33,56 @@ We evaluated two ways to compute `cadence_days` via [`api/trends.py`](../api/tre
 
 ---
 
-## 2. Same-Day vs. Per-List Addition Cadence
+## 2. Session Window vs. Calendar Day for Deduplicating Additions
 
 ### Context
-A user may add the same item to multiple lists on the same day (or re-add it while reorganizing lists).
+A user may add the same item to multiple lists in one sitting (or re-add it while reorganizing lists).
 
 ### Decision for v1
 - **`list_inclusion` (immutable log):** Records every raw item addition across lists as-is.
-- **`item_trend` (derived cadence):** Collapses multiple additions of the same item on the **same UTC calendar day** into a single daily inclusion when computing `inclusion_count` and `cadence_days`.
-- **Rationale:** Cadence of *addition per list* is different from *re-purchase cadence per day*. Without same-day deduplication, adding `"milk"` to two lists on the same day produces a `0.0`-day interval that collapses `cadence_days` and triggers premature re-purchase recommendations.
+- **`item_trend` (derived cadence):** Collapses additions of the same item into **sessions** (`SESSION_WINDOW` in [`api/trends.py`](../api/trends.py), 12 hours). An addition joins the current session if it is less than 12 hours after the session's *first* addition; otherwise it starts a new session. Each session counts once toward `inclusion_count` and `cadence_days`, keeping its latest timestamp.
+- **Rationale:** Cadence of *addition per list* is different from *re-purchase cadence*. Without deduplication, adding `"milk"` to two lists in one sitting produces a near-`0`-day interval that collapses `cadence_days` and triggers premature re-purchase recommendations.
+
+### Options Considered
+- **UTC calendar day (original v1):** Rejected. The UTC date rolls over at 8pm in UTC-4, so additions at 7:58pm and 8:03pm counted as two days with a 5-minute cadence.
+- **User's local calendar day:** Deferred. Needs a stored user timezone (a schema change, and there is no migration tool yet), DST/travel handling, and still splits additions across local midnight.
+- **Window measured from the previous addition:** Rejected. Additions each under 12 hours apart chain into one unbounded session, so a frequently added item could stay at `inclusion_count = 1` and never be recommended. Measuring from the session start caps a session at 12 hours.
+- **24-hour window:** Rejected. It collapses one shopping day, but an item added every day at slightly different times merges about half the time (9am Monday and 7am Tuesday are 22 hours apart). That halves `inclusion_count` and doubles `cadence_days` for items bought daily. 12 hours keeps consecutive days separate.
 
 ### Considerations for Later
-- **User timezone vs. UTC calendar day:** Grouping by UTC date can split a late-evening local shopping session across two UTC dates (or merge two local days). Once user locale/timezone is stored, bucket by the user's local calendar date or a configurable session window (e.g., `< 12h` between additions).
-- **Per-list vs. per-household cadence:** If lists represent distinct recurring contexts (e.g., "Costco monthly" vs. "Corner store weekly"), cadence may eventually benefit from list-scoped or store-scoped modeling rather than a single global per-item cadence.
+- **Window size:** Two genuine trips less than 12 hours apart merge. Acceptable while cadences are measured in days; tune `SESSION_WINDOW` from data if needed.
+- **Existing rows:** `item_trend` rows computed under the calendar-day rule are corrected the next time that item is added; run `db.update_item_trend` over existing `(user_id, item_name)` pairs to correct them immediately.
+- **Per-list vs. per-household cadence:** See section 3 (purpose label on lists).
+
+---
+
+## 3. Interpreting Repeated Additions: Duplicate, Source, and List Purpose
+
+### Context
+The same item on several lists can mean three different things:
+1. **Duplicate:** the user forgot it was already listed and added it again.
+2. **Different source:** it came from a recipe or from an accepted recommendation, not from habit.
+3. **Different-purpose list:** e.g. a party list or a monthly Costco list alongside the weekly shop.
+
+The session window (section 2) can't tell these apart, because all three can happen within the same hour.
+
+### Decision for v1
+- Every addition counts equally once merged into a session.
+- Merging across lists stays: the same item on two lists on the same day is usually one purchase. Where an addition came from should change how much it counts, not whether it merges.
+
+### Options for Later
+- **Duplicate flag, recorded when the item is added.**
+  - *Signal:* the same `item_name` is already unchecked on one of the user's active lists. The current schema can detect this.
+  - *Use:* exclude flagged rows from the habit count. A UI warning ("Milk is already on Weekly") would prevent most duplicates in the first place.
+  - *Why at add time:* the evidence is gone once the item is checked off or its list is deleted, and `list_inclusion` is append-only, so it can't be reconstructed later.
+- **Source on each inclusion (`manual`, `recipe`, `recommendation`).**
+  - *Use:* recipe adds get a lower weight (around 0.3–0.5) or feed the recipe recommender (M3) instead of re-purchase habit.
+  - Accepted recommendations count toward cadence like any addition, plus an outcome (PRD 02 F5). Excluding them stalls `last_included_at` for items accepted every cycle. `source` is recorded so they can be down-weighted later ([ADR 0003](./adr/0003-accepted-suggestions-count-toward-cadence.md), decided 2026-11-02).
+- **Purpose label on lists.** Enables cadence per context (e.g., Costco every 30 days alongside the corner store every 7) instead of one global per-item cadence.
+  - *2026-11-04:* for deciding when to show suggestions, an explicit purpose picker was rejected in favour of an inferred **grocery intent** score from the title and items (PRD 02 §4a), so the Shopper never has to classify a list. Per-purpose cadence is still open.
+- **Several metrics instead of one count:** raw adds, sessions (habit), number of distinct lists an item appears on, and duplicate rate. A high duplicate rate is itself a signal that the user forgets what is already listed.
+- **Check-offs as a purchase signal.** `needed_item.checked` is the closest thing to "bought"; recording it separately from adds would distinguish "listed" from "bought".
+
+### Considerations
+- The source and the list purpose label both need schema changes, and there is no migration tool yet.
+- The duplicate flag needs only a new column on `list_inclusion` (plus the add-time check in `api/db.py`).
