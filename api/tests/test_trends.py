@@ -69,10 +69,41 @@ def test_same_day_additions_followed_by_next_week_preserve_weekly_cadence():
     assert trend.next_due_at == next_week + timedelta(days=7)
 
 
-def test_calculate_score_falls_back_to_frequency_when_no_cadence():
+def test_additions_across_utc_midnight_in_one_sitting_collapse():
+    # 7:58pm and 8:03pm EDT straddle UTC midnight but are one sitting.
+    edt = timezone(timedelta(hours=-4))
+    first = datetime(2026, 10, 1, 19, 58, tzinfo=edt)
+    second = datetime(2026, 10, 1, 20, 3, tzinfo=edt)
+    trend = Trend.from_inclusions("milk", [first, second])
+    assert trend.inclusion_count == 1
+    assert trend.last_included_at == second
+    assert trend.cadence_days is None
+
+
+def test_additions_under_12h_apart_collapse_and_over_12h_stay_separate():
+    assert Trend.from_inclusions("milk", [T0, T0 + timedelta(hours=11)]).inclusion_count == 1
+    assert Trend.from_inclusions("milk", [T0, T0 + timedelta(hours=13)]).inclusion_count == 2
+
+
+def test_session_window_is_measured_from_session_start_so_chains_split():
+    # Each addition is 11h after the previous one; sessions must not chain forever.
+    timestamps = [T0 + timedelta(hours=11 * i) for i in range(5)]  # 0, 11, 22, 33, 44h
+    trend = Trend.from_inclusions("coffee", timestamps)
+    # Sessions start at 0h (+11h), 22h (+33h), 44h.
+    assert trend.inclusion_count == 3
+    assert trend.last_included_at == timestamps[-1]
+
+
+def test_calculate_score_is_zero_for_one_off_items():
     trend = Trend.from_inclusions("milk", [T0])
-    # inclusion_count = 1, freq_norm = 5 -> 0.2
-    assert trend.calculate_score(now=T0 + timedelta(days=3)) == pytest.approx(0.2)
+    assert not trend.is_eligible
+    assert trend.calculate_score(now=T0 + timedelta(days=3)) == 0.0
+
+
+def test_calculate_score_falls_back_to_frequency_when_no_cadence():
+    trend = Trend(item_name="milk", inclusion_count=3, last_included_at=T0)
+    # inclusion_count = 3, freq_norm = 5 -> 0.6
+    assert trend.calculate_score(now=T0 + timedelta(days=3)) == pytest.approx(0.6)
 
 
 def test_calculate_score_combines_frequency_and_recency():

@@ -1,7 +1,7 @@
 """Trend calculation and re-purchase scoring (PRD 01 & PRD 02).
 
 Pure domain logic with no database dependency. `Trend` derives `inclusion_count`,
-`cadence_days` (median interval between distinct UTC inclusion days), `last_included_at`,
+`cadence_days` (median interval between inclusion sessions), `last_included_at`,
 and `next_due_at`, and calculates the frequency + recency score at read time.
 """
 
@@ -15,6 +15,10 @@ from typing import Iterable
 SECONDS_PER_DAY = 86400.0
 DEFAULT_FREQ_NORM = 5
 DUE_RATIO_CAP = 1.5
+MIN_INCLUSIONS = 2
+# Measured from the first addition of a session, so a run of additions each
+# under 12h apart cannot chain into one unbounded session.
+SESSION_WINDOW = timedelta(hours=12)
 
 
 def _as_utc(dt: datetime) -> datetime:
@@ -39,10 +43,11 @@ class Trend:
     def extract_cadence(self, timestamps: Iterable[datetime]) -> float | None:
         """Compute median cadence in days from an ordered sequence of timestamps.
 
-        Same-day additions (in UTC) are collapsed to a single daily inclusion so
-        adding the same item to multiple lists on the same day does not skew
-        cadence toward zero. Updates `inclusion_count`, `last_included_at`,
-        `cadence_days`, and `next_due_at`.
+        Additions within `SESSION_WINDOW` of a session's first addition collapse
+        into one inclusion, so adding the same item to several lists in one
+        sitting does not skew cadence toward zero. This is timezone-independent.
+        Updates `inclusion_count`, `last_included_at`, `cadence_days`, and
+        `next_due_at`.
         """
         ordered = sorted(_as_utc(ts) for ts in timestamps)
         if not ordered:
@@ -50,12 +55,14 @@ class Trend:
 
         self.inclusion_count = 0
         deduped: list[datetime] = []
+        session_start: datetime | None = None
         for ts in ordered:
-            if not deduped or ts.date() != deduped[-1].date():
+            if session_start is None or ts - session_start >= SESSION_WINDOW:
                 self.increment_one()
                 deduped.append(ts)
+                session_start = ts
             else:
-                # Keep the latest timestamp within the same UTC calendar day.
+                # Keep the latest timestamp within the session.
                 deduped[-1] = ts
 
         self.last_included_at = deduped[-1]
@@ -81,6 +88,11 @@ class Trend:
         trend.extract_cadence(timestamps)
         return trend
 
+    @property
+    def is_eligible(self) -> bool:
+        """PRD 02 step 4: a re-purchase needs at least `MIN_INCLUSIONS` inclusions."""
+        return self.inclusion_count >= MIN_INCLUSIONS
+
     def calculate_score(
         self,
         now: datetime | None = None,
@@ -89,9 +101,10 @@ class Trend:
         """Score re-purchase urgency in [0, 1] per PRD 02 section 4.
 
         Combines habit strength (`frequency_score`) with recency (`due_score`).
+        Items below `MIN_INCLUSIONS` are not a re-purchase habit and score 0.
         Falls back to `frequency_score` when cadence is not yet established.
         """
-        if self.inclusion_count <= 0:
+        if not self.is_eligible:
             return 0.0
 
         frequency_score = min(self.inclusion_count / float(freq_norm), 1.0)

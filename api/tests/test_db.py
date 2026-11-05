@@ -18,6 +18,8 @@ def uid():
 
 
 async def inclusions(pool, uid):
+    # included_at defaults to now(), the transaction start, so rows written in one
+    # transaction tie; their relative order is undefined.
     return await pool.fetch(
         "SELECT item_name, list_id FROM list_inclusion WHERE user_id = $1 ORDER BY included_at",
         uid,
@@ -40,7 +42,7 @@ async def test_create_list_creates_user_list_items_and_inclusions(pool, uid):
         "SELECT title FROM grocery_list WHERE id = $1", uuid.UUID(created["id"])
     ) == "Weekly"
     rows = await inclusions(pool, uid)
-    assert [r["item_name"] for r in rows] == ["milk", "eggs"]
+    assert sorted(r["item_name"] for r in rows) == ["eggs", "milk"]
     assert {str(r["list_id"]) for r in rows} == {created["id"]}
 
 
@@ -116,7 +118,7 @@ async def test_delete_list_cascades_items_but_keeps_inclusion_history(pool, uid)
 
     assert await pool.fetchval("SELECT count(*) FROM needed_item WHERE list_id = $1", list_id) == 0
     rows = await inclusions(pool, uid)
-    assert [r["item_name"] for r in rows] == ["milk", "eggs"]
+    assert sorted(r["item_name"] for r in rows) == ["eggs", "milk"]
     assert all(r["list_id"] is None for r in rows)  # ON DELETE SET NULL
 
 
@@ -128,16 +130,16 @@ async def test_delete_list_returns_false_when_missing_or_foreign(pool, uid):
     assert await db.get_list(uid, list_id) is not None
 
 
-async def test_create_list_and_add_item_populate_item_trend_with_same_day_dedup(pool, uid):
+async def test_create_list_and_add_item_populate_item_trend_with_session_dedup(pool, uid):
     created = await db.create_list(uid, "Weekly", ["milk", "eggs"])
     list_id = uuid.UUID(created["id"])
 
-    # Adding milk again on the same day appends to list_inclusion, but keeps
-    # item_trend at 1 daily inclusion with null cadence.
+    # Adding milk again in the same sitting appends to list_inclusion, but keeps
+    # item_trend at 1 inclusion with null cadence.
     await db.add_item(uid, list_id, "milk")
 
     inc_rows = await inclusions(pool, uid)
-    assert [r["item_name"] for r in inc_rows] == ["milk", "eggs", "milk"]
+    assert sorted(r["item_name"] for r in inc_rows) == ["eggs", "milk", "milk"]
 
     trend_rows = {r["item_name"]: r for r in await trends(pool, uid)}
     assert set(trend_rows) == {"milk", "eggs"}
