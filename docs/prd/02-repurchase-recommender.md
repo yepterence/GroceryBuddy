@@ -38,7 +38,8 @@ AI capture loop (PRD 03).
 
 ## 3. User Stories
 
-- As a shopper, I see a "re-purchase" list generated from my history, one tap to add to a list.
+- As a shopper building a grocery list, I see items I'm due to re-buy and add one to that list with one tap.
+- As a shopper, after a one-tap add I see where it went ("Added to Weekly shop").
 - As a shopper, each suggestion tells me **why** ("you buy oat milk ~weekly; last added 9
   days ago").
 
@@ -52,7 +53,7 @@ checkout data exists.
 included in a list (`inclusion_count`) and the distinct list/sessions it appeared in. This
 count is the core driver: items added repeatedly are habitual re-purchases.
 
-**Step 2 — cadence (recency-aware).** From the inclusion timestamps (deduplicated to one inclusion per UTC calendar day so adding the same item to multiple lists on the same day counts as a single addition; see [`../tradeoffs.md`](../tradeoffs.md)), compute the median interval between inclusions, `cadence_days`, and `days_since = now - last_included_at`.
+**Step 2 — cadence (recency-aware).** From the inclusion timestamps (deduplicated into sessions: additions within 12 hours of a session's first addition count as one, so adding the same item to multiple lists in one sitting is a single addition; see [`../tradeoffs.md`](../tradeoffs.md)), compute the median interval between inclusions, `cadence_days`, and `days_since = now - last_included_at`.
 (With only one inclusion, cadence is undefined — see eligibility.)
 
 **Step 3 — score.** Combine *habit strength* (frequency) with *due-ness* (recency):
@@ -66,8 +67,8 @@ score           = 0.5 * frequency_score + 0.5 * due_score  # weights tunable
 
 **Step 4 — eligibility / filters.**
 - Require `inclusion_count >= 2` (a one-off isn't a re-purchase habit).
-- Skip items already present & unchecked in `needed_items` (don't recommend what's already
-  on the list).
+- Skip **Open items**: items unchecked on any of the Shopper's lists (don't recommend what's
+  already on a list). Lists have no active/closed state; see [`../../GLOSSARY.md`](../../GLOSSARY.md).
 - For items with `inclusion_count >= 2` but no reliable cadence yet, fall back to
   `score = frequency_score` (pure habit strength).
 
@@ -85,16 +86,58 @@ recommendation = {
 > Note: the `{type, payload, reason, score}` shape is intentionally identical to what PRD
 > 04 will standardize. This module just hardcodes it.
 
+## 4a. When suggestions are shown and hidden (decided 2026-11-04)
+
+**Where.** Inside a list while it is being built (the create form, before it is saved) and on
+saved lists. Never as a standalone feed.
+
+**When.** Only once the list shows enough **grocery intent**, recomputed as each Item is added,
+so a party or event list does not get milk suggestions. PoC rule (word lists and thresholds
+kept in one place so they can be tuned):
+
+- **Title signal:** a grocery word in the title (`grocery`, `groceries`, `weekly`, `shop`,
+  `market`, `food`, `costco`) shows suggestions. An event word (`party`, `bbq`, `birthday`,
+  `potluck`, `christmas`) always hides them.
+- **Item signal:** with at least 2 Items on the list, show suggestions when at least half of
+  them are Items the Shopper has added before.
+
+**Computed where.** The list opens with one `GET /recommendations/repurchase?user_id=`, which
+returns the due suggestions (dismissals already applied) and the Shopper's known Item names.
+The browser scores intent locally as Items are added. The score is not stored on saved lists;
+it is recomputed when a list is shown.
+
+**How many.** At most 5, highest score first, and only Items that are due: `days_since >= 0.8 ×
+cadence_days`. Tune the 0.8 and the 5 from acceptance data.
+
+**Presentation (decided 2026-11-10).** One Suggestion at a time, in the empty Item slot, with
+its reason. Accepting adds that one Item, and the next due Suggestion takes the empty slot,
+so accepting N times adds N Items. The bubble never lists several Items, and one tap never
+adds several (see §11). Starting to type in the slot dismisses the shown Suggestion; the typed
+text stays, and the next Suggestion appears once the slot is empty again. After 10 seconds
+with no action the bubble collapses to a chip, which is not a dismissal: clicking the chip
+brings the same Suggestion back and restarts the 10 seconds. Saving or leaving the list does
+not dismiss Suggestions the Shopper left alone; they stay due.
+
+**Dismissals.** Stored as an outcome on the suggestion the Shopper saw. The Shopper dismisses
+with the dismiss control (button or swipe) or by typing over the Suggestion. A dismissed Item is
+not suggested again until the Shopper adds it to a list themselves (its next Inclusion).
+Dismissal is a clear "no"; the way back is the Shopper's own add, or later a price offer (F7).
+
+**Accepting.** In the create form a tap adds the Item to the draft; on save each Item is sent
+with its `source`, so `POST /lists` takes `items: [{name, source}]`.
+
 ## 5. Functional Requirements
 
 | ID | Requirement |
 |----|-------------|
 | F1 | Compute per-item `inclusion_count` (+ cadence when available) from `list_inclusion_history` |
 | F2 | Generate scored re-purchase suggestions per the frequency + recency algorithm above |
-| F3 | Exclude items already on an active list |
-| F4 | Surface suggestions in the UI with a one-tap "add to list" action |
-| F5 | Record acceptance (added? dismissed?) as an outcome signal for later ranking/training |
+| F3 | Exclude Open items (unchecked on any of the Shopper's lists) |
+| F4 | Surface suggestions **inside the list the Shopper is building** (the create form, and saved lists), once the list's **grocery intent** is high enough (§4a). One tap adds the item to that same list and confirms it with a banner: "Added to {list title}", or "Added to this list" when untitled (decided 2026-11-03/04) |
+| F5 | Record acceptance (added? dismissed?) as an outcome signal for later ranking/training. An accepted suggestion **does** count toward cadence like any addition, tagged `source = suggestion` so it can be down-weighted later ([ADR 0003](../adr/0003-accepted-suggestions-count-toward-cadence.md)) |
 | F6 | (Optional) blend in `purchase_history` when checkout data is available |
+| F7 | (Later, after flyer matching, auth and mobile) When a dismissed item appears in this week's flyer, offer it again with the price as the reason, optionally as a notification |
+| F8 | (Later) Re-rank suggestions on the server as the draft list changes, instead of the PoC's single fetch when the list opens |
 
 ## 6. Data Model
 
@@ -105,9 +148,15 @@ recommendation_outcome(id, recommendation_id, action, occurred_at)   -- accepted
 
 (The shared `recommendation` table is introduced here and reused by PRD 04.)
 
+Suggestions are **computed on read** from `item_trend` (`GET /recommendations/repurchase?user_id=`, shape in §4a).
+A `recommendation` row is written only when the Shopper accepts or dismisses a suggestion, so
+every outcome points at exactly what they saw. Decided 2026-11-02.
+
+`list_inclusion` gains `source` (`manual` | `suggestion`) per ADR 0003.
+
 ## 7. Non-Functional
 
-- Recompute on new list inclusions or on a daily schedule; cache the feed.
+- `item_trend` is updated on each new Addition; suggestions are computed from it on read (no cached feed).
 - Cold start: user with <2 inclusions of an item gets no suggestion for it (graceful empty state).
 
 ## 8. Success Metrics
@@ -120,7 +169,93 @@ recommendation_outcome(id, recommendation_id, action, occurred_at)   -- accepted
 
 - Frequency vs recency weighting (the 0.5/0.5 blend) — tune from acceptance data.
 - What counts as an "inclusion": adding to a list, checking it off, or both? (v1: add-to-list.)
+  Check-offs (`needed_item.checked`) are a candidate purchase signal, kept separate from adds.
+- How should duplicate, recipe-sourced and recommendation-sourced additions be weighted?
+  Options and the signals each needs are in [`../tradeoffs.md`](../tradeoffs.md) §3.
 - Cadence model: median interval is the v1 choice; revisit with a survival/hazard model if
   precision is poor.
 - Should accepted suggestions also log a `purchase_event` (when checkout exists) to enrich
   the optional purchase signal?
+- F3 uses Open items, not "active lists" (decided 2026-11-02). An item left unchecked after
+  it was bought stays Open and blocks its own recommendations indefinitely. See §10.
+- Is a lasting dismissal on typing too strong for an Item that just does not belong on this
+  list? See §11.
+
+## 10. Deferred: Handling Missed Check-offs
+
+> Status: later feature, not in v1. Build order decided 2026-10-31.
+
+### Problem
+
+Users often grab an item without checking it off. Two effects:
+
+- **Cadence is unaffected.** `item_trend` is computed from additions to a list, not
+  check-offs, so the next add of the item still lands correctly.
+- **F3 is affected.** The forgotten item stays unchecked, so it counts as "already on an
+  active list" and its re-purchase suggestion is suppressed until the user cleans up.
+
+Check-offs are therefore a useful but unreliable purchase signal. This feature closes the
+gap with low-friction confirmations, then inference.
+
+### Phases (in build order)
+
+1. **End-of-trip prompt (batch).** When most of a list is checked off, or the user returns
+   to a list after a gap, ask once: "Mark the N remaining items as bought?" with
+   **All** / **Choose** / **None**. One prompt per trip, never per item.
+2. **Re-add prompt.** When an item is added while an unchecked copy is still on another
+   list, ask: "Milk is still on *Weekly* from Oct 21. Did you buy it?" with
+   **Yes, bought it** (resolve the old copy as purchased) / **No, move it here** (treat the
+   new add as a duplicate). This also covers the duplicate case in
+   [`../tradeoffs.md`](../tradeoffs.md) §3.
+3. **Silent inference.** If a prompt is dismissed or never shown, infer a purchase when an
+   unchecked item is re-added after roughly half its `cadence_days`, or has been unchecked
+   longer than about 1.5× its cadence (stale). Inferred purchases are labelled as such.
+
+No push notifications for this: per-item "did you buy it?" pings cause prompt fatigue and
+worse data than not asking.
+
+### Data model (proposed)
+
+```
+purchase_event(id, user_id, item_name, occurred_at, evidence, needed_item_id?)
+  evidence: receipt | confirmed_prompt | checked | inferred_readd | inferred_stale
+```
+
+Approximate trust order: `receipt` > `confirmed_prompt` > `checked` > `inferred_readd` >
+`inferred_stale`. Feeds F6 as the purchase-history enrichment, weighted by `evidence`.
+Cadence stays computed from `list_inclusion`. A receipt photo (PRD 03 capture) is a
+possible later `receipt` source.
+
+### Open questions
+
+- Thresholds for "most of a list checked" (phase 1) and for staleness (phase 3).
+- Whether a resolved-as-purchased item is auto-checked, hidden, or removed from its list.
+
+## 11. Deferred: Several Suggestions in One Bubble
+
+> Status: rejected for v1 (decided 2026-11-10). v1 shows one Suggestion at a time (§4a).
+
+### Problem
+
+A set of due Items is often mixed: oat milk belongs on this list, and candles do not. A
+bubble that holds the whole set has no honest gesture:
+
+- **Accept the bubble.** Every Item lands on the list, including the ones that do not
+  belong. The Shopper deletes them by hand, and each accepted Item still counts toward
+  Cadence (`source = suggestion`, ADR 0003), so wrong accepts distort the habit data.
+- **Dismiss the bubble.** The relevant Items go away with the irrelevant ones, and each
+  dismissal is lasting: those Items stay hidden until the Shopper adds them themselves.
+- **Per-item controls inside the bubble.** That is several Suggestions sharing one
+  container, which is the one-at-a-time queue with more on screen.
+
+### Decision
+
+Do not ship a bubble that accepts or dismisses a set as a whole. If several Items are ever
+shown together, each must be accepted or passed over on its own.
+
+### Open questions
+
+- v1 moves past the shown Item only by accepting it or by a lasting dismissal (the control or
+  typing over it). "Not on this list" is a weaker answer than "stop suggesting this." If
+  dismissal data shows Shoppers rejecting Items that are genuinely due, add a skip that
+  advances to the next Suggestion for this visit and writes no outcome.

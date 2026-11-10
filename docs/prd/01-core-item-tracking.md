@@ -61,16 +61,16 @@ list_inclusion(id, user_id, item_name, list_id, included_at)
 item_trend(user_id, item_name, inclusion_count, cadence_days, last_included_at, next_due_at)
 ```
 
-`purchase_event(id, user_id, item_name, product_ref?, occurred_at)` stays **out of this schema** until a receipt or checkout source exists.
+`purchase_event(id, user_id, item_name, product_ref?, occurred_at)` stays **out of this schema** until a receipt or checkout source exists. [PRD 02 §10](./02-repurchase-recommender.md#10-deferred-handling-missed-check-offs) proposes check-offs, confirmation prompts and inference as further sources, each tagged with its `evidence`.
 
 Notes:
 
-- `user.id` is an unguessable id created on first visit and stored by the client. Every list and item read is filtered by it. It segregates tenants. It does not authenticate the caller. Sending the id is enough to read and write that user's rows.
-- **Acquired** is `needed_item.checked`. Checking an item off marks that row done. It does not write a `list_inclusion`.
+- `user.id` is an unique id created on first visit and stored by the client. Every list and item read is filtered by it. It segregates tenants. It does not authenticate the caller. Sending the id is enough to read and write that user's rows.
+- **Acquired** is when an item is checked off. Checking an item off marks that row done. It does not write a `list_inclusion`.
 - `list_inclusion` is an append-only log written when an item is **added** to a list. `included_at` is that timestamp. These rows are the frequency tracker (F3, F4). "Placed in cart" in v1 means this add.
 - Deleting a list deletes its `needed_item` rows. Inclusion rows stay, with `list_id` set null, so counts survive across lists (F4).
-- `list_inclusion` is **immutable** truth. `item_trend` is a **derived, recomputable** cache, updated when a new inclusion lands, so a list read does not rescan history. `cadence_days` and `next_due_at` stay null until a second inclusion makes an interval possible. Same-day additions of the same item (even across multiple lists) are collapsed into a single daily inclusion when computing `item_trend` so same-day additions do not skew `cadence_days` toward zero (see [`../tradeoffs.md`](../tradeoffs.md)).
-- `item_name` is the join key for now; a canonical product/food id can be introduced later (PRD 03/04) without breaking this model.
+- `list_inclusion` is **immutable** truth. `item_trend` is a **derived, recomputable** cache, updated when a new inclusion lands, so a list read does not rescan history. `cadence_days` and `next_due_at` stay null until a second inclusion makes an interval possible. Additions of the same item within 12 hours of the first addition in a session (even across multiple lists) are collapsed into a single inclusion when computing `item_trend`, so `inclusion_count` there counts sessions, not raw adds, and one sitting does not skew `cadence_days` toward zero (see [`../tradeoffs.md`](../tradeoffs.md)).
+- `item_name` is the join key for now, normalized (lowercased, whitespace collapsed) so `Milk` and `milk` are one item while `2% milk` stays separate. A canonical food id can be introduced later (PRD 03/04) as labels on an item, never by merging histories. See [ADR 0001](../adr/0001-item-identity-by-normalized-name.md).
 - No price column and no vendor table. A Flipp price is a per-store, time-bounded observation. M1 ranks coverage from the scraper response at request time. An item with no flyer price does not count toward that store's coverage.
 
 ## 6. Signal Contracts (consumed by later PRDs)
@@ -97,7 +97,7 @@ Price and store never enter these contracts.
 
 ## 9. Open Questions
 
-- Canonical product identity: stay string-keyed (`item_name`) in v1, or introduce a product/food id now? (Leaning string-keyed for v1; revisit in PRD 03.)
+- ~~Canonical product identity~~ Decided 2026-11-02: normalized `item_name` in v1; food identity in PRD 03 adds labels without merging ([ADR 0001](../adr/0001-item-identity-by-normalized-name.md)).
 - Inclusion definition: count an add-to-list, a check-off, or both as an inclusion event? (v1: add-to-list.)
 - Optional purchase events: only if/when receipt/cart integrations exist.
 - **Production blocker:** authentication (who is calling) and authorization (they may only touch their own `user_id`) must exist before the app is dockerized or treated as production. Phase 0 does not build this. See below.
@@ -106,7 +106,7 @@ Price and store never enter these contracts.
 
 Phase 0 ships the anonymous `user.id` only. There is no password, email, or session table.
 
-Before Docker or any deployment treated as production:
+Before Docker, any deployment treated as production, or the mobile version ([ADR 0002](../adr/0002-anonymous-device-bound-shopper.md)):
 
 - Authentication must establish who is calling.
 - Authorization must allow a caller to touch only their own `user_id`.

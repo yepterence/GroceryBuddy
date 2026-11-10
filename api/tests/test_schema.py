@@ -7,12 +7,22 @@ import pytest_asyncio
 
 from conftest import SCHEMA_PATH, TEST_DATABASE_URL
 
-TABLES = {"user", "grocery_list", "needed_item", "list_inclusion", "item_trend"}
+TABLES = {
+    "user",
+    "grocery_list",
+    "needed_item",
+    "list_inclusion",
+    "item_trend",
+    "recommendation",
+    "recommendation_outcome",
+}
 INDEXES = {
     "grocery_list_user_id_idx",
     "needed_item_list_id_idx",
     "needed_item_user_id_idx",
     "list_inclusion_user_item_idx",
+    "recommendation_user_id_idx",
+    "recommendation_outcome_recommendation_id_idx",
 }
 
 

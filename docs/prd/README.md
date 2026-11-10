@@ -72,21 +72,26 @@ slice that demonstrates the differentiated loop end-to-end, and *design* (not bu
 rest. A small, finished slice + clear design docs signals deliberate scoping; a sprawling,
 half-built platform does not.
 
-**The differentiated loop to demonstrate:**
-`food photo → nutrition → nutrient gap → suggested item → price-matched against local flyer data`
-— this nutrition↔local-grocery bridge is the one genuinely under-served seam vs. market
-apps (MyFitnessPal/Cronometer stop at the gap; Flipp/Reebee don't know nutrition).
+**The v1 loop to demonstrate (decided 2026-11-02, revised 2026-11-03):**
+`build a list → re-purchase suggestions appear in that list → one tap adds them`
+— a quick proof of concept built on data the app already collects. Flyer prices are left
+out of v1: plain-text name matching is too ambiguous, and good matching needs Item Labels
+(PRD 03) or an AI retriever. The full
+`food photo → nutrition → nutrient gap → suggested item → flyer price` loop remains the
+long-term differentiator (MyFitnessPal/Cronometer stop at the gap; Flipp/Reebee don't know
+nutrition) and is built only if time allows after the v1 loop ships.
 
 | PRD / module | v1 status | Notes |
 |--------------|-----------|-------|
 | 01 Core item tracking | **Build** | Small foundation; needed-items + **list-inclusion history** |
 | 02 Re-purchase (M2) | **Build (vital)** | Driven by **list-inclusion frequency** the core app already produces; no AI/nutrition dependency |
-| 03 AI capture + nutrition | **Build (thin)** | Use a **vision LLM** (no model training); nutrition via Open Food Facts / USDA |
-| M1 flyer/price (existing scraper) | **Build (wrap)** | Already exists — wrap `api/scraper.py` |
-| M3 recipe/item by nutrient gap | **Build (thin)** | Just enough to close the loop to M1 |
-| 04 Framework contract + registry | **Build (minimal)** | Prove the plugin contract with multiple modules (M1, M2, M3) |
+| M1 flyer/price (existing scraper) | **Deferred** | Needs label-based (or AI-retrieved) matching first; flyer data cached per postal code when built ([design §4 M1](../modular-recommendations-design.md)) |
+| 04 Framework contract + registry | **Design-only (v1)** | One recommender can't prove a plugin contract; extract once a second real recommender exists |
+| 03 AI capture + nutrition | **Stretch (thin)** | Only after the v1 loop ships. Vision LLM (no training); nutrition via Open Food Facts / USDA |
+| M3 recipe/item by nutrient gap | **Stretch (thin)** | Depends on 03 |
 | M4 / M5 / M6 | **Design-only** | Documented as "designed, not built" + roadmap |
-| Data-moat machinery, custom model, native-mobile polish | **Out of scope** | Company concerns; in a portfolio they read as unfinished scope |
+| Mobile version | **Final step, after auth** | Required. Approach is an open decision (PWA, Capacitor-wrapped web app, or React Native); revisit before building the frontend component structure further |
+| Data-moat machinery, custom model | **Out of scope** | Company concerns; in a portfolio they read as unfinished scope |
 
 **Why design-only is fine (and good):** demonstrating an extensible design + a credible
 roadmap (M4–M6 as drop-in modules) is stronger portfolio signal than half-building six
@@ -96,4 +101,4 @@ modules. The PRDs themselves are part of the deliverable.
 
 PRD 01 segregates lists with an anonymous `user.id` and stores no email, password, or session. That id is a tenant key: whoever can send it can read and write those rows.
 
-**Blocker:** authentication (who is calling) and authorization (a caller may only touch their own `user_id`) must exist before this app is dockerized or treated as production. The `user_id` foreign keys stay. Production replaces "the client sends an id" with "a session proves this caller owns this id." See [PRD 01 §10](./01-core-item-tracking.md#10-production-gate).
+**Blocker:** authentication (who is calling) and authorization (a caller may only touch their own `user_id`) must exist before this app is dockerized, treated as production, or shipped as the mobile version ([ADR 0002](../adr/0002-anonymous-device-bound-shopper.md)). The `user_id` foreign keys stay. Production replaces "the client sends an id" with "a session proves this caller owns this id." See [PRD 01 §10](./01-core-item-tracking.md#10-production-gate).

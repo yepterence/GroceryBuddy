@@ -115,7 +115,7 @@ Normalized, read-only feature layer so modules don't re-derive data.
 | `nutrition` | nutrition mapping | M3 |
 | `needed_items` | shopping list | M1, M2 |
 | `purchase_history` | optional checkout events | M2 (enrichment), M6 |
-| `location` | user profile | M1 |
+| `location` | sent by the device per request; never stored server-side until auth ([ADR 0002](./adr/0002-anonymous-device-bound-shopper.md)) | M1 |
 | `flyer_data` | existing scraper | M1 |
 | `restaurant_visits` | user input / integrations | M6 |
 | `taste_profile` | derived from likes/corrections/visits | M5, M6 |
@@ -136,6 +136,12 @@ Normalized, read-only feature layer so modules don't re-derive data.
 - **status**: **already exists** — wrap `api/scraper.py` (`get_price_dict`) / the
   `/get-prices` endpoint as a `Recommender`. Mostly an adapter.
 - **payload**: `{ item, store, price, brand }`
+- **matching (decided 2026-11-03)**: deferred from v1. The current case-sensitive substring
+  match (`item in flyer_name`) is too ambiguous (`milk` vs `Milk Chocolate Bar`). Needs Item
+  Labels (PRD 03) or an AI retriever that picks the most likely flyer listing from them.
+- **flyer data**: fetched on a price request and cached per postal code until the flyer
+  expires; the cache never stores which Shopper asked
+  ([ADR 0002](./adr/0002-anonymous-device-bound-shopper.md)). Replaces the CLI data-folder workflow.
 
 ### M2 — Re-purchase from list-inclusion frequency (trend spotting)
 - **consumes**: `list_inclusion_history` (primary), `needed_items`; optional `purchase_history`

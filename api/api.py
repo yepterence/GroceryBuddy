@@ -9,7 +9,9 @@ from sanic import Blueprint
 from sanic.response import json
 
 import db
+from items import normalize_item_name
 from scraper import Scraper
+from suggestions import OUTCOME_ACTIONS, SUGGESTION_TYPE
 
 bp = Blueprint("lists_blueprint")
 app = Sanic("grocery_buddy_server")
@@ -62,18 +64,42 @@ def _parse_uuid(value):
         return None
 
 
+def _valid_source(value):
+    return value if value in db.SOURCES else None
+
+
 def _clean_items(raw):
-    """Return a list of non-empty stripped names, or None if invalid."""
+    """Return `(name, source)` pairs with blank names dropped, or None if invalid.
+
+    Each entry is a name string (source `manual`) or `{"name": str, "source": str}`.
+    """
     if raw is None:
         return []
-    if not isinstance(raw, list) or not all(isinstance(i, str) for i in raw):
+    if not isinstance(raw, list):
         return None
-    return [i.strip() for i in raw if i.strip()]
+    cleaned = []
+    for entry in raw:
+        if isinstance(entry, str):
+            name, source = entry, "manual"
+        elif isinstance(entry, dict):
+            name, source = entry.get("name"), _valid_source(entry.get("source", "manual"))
+            if source is None:
+                return None
+        else:
+            return None
+        if not isinstance(name, str):
+            return None
+        if name.strip():
+            cleaned.append((name.strip(), source))
+    return cleaned
 
 
 @bp.post("/lists")
 async def save_list(request):
-    """Save a generated list. Body: {"user_id": uuid, "title": str, "items": [str]}"""
+    """Save a generated list.
+
+    Body: {"user_id": uuid, "title": str, "items": [str | {"name": str, "source": str}]}
+    """
     data = request.json
     if not isinstance(data, dict):
         return _error("JSON body required")
@@ -85,7 +111,7 @@ async def save_list(request):
     if not isinstance(title, str) or not title.strip():
         return _error("title is required")
     if items is None:
-        return _error("items must be a list of strings")
+        return _error("items must be a list of names or {name, source} objects")
     created = await db.create_list(user_id, title.strip(), items)
     return json({"status": "success", "list": created}, status=201)
 
@@ -123,18 +149,21 @@ async def remove_list(request, list_id):
 
 @bp.post("/lists/<list_id:str>/items")
 async def create_item(request, list_id):
-    """Body: {"user_id": uuid, "name": str}"""
+    """Body: {"user_id": uuid, "name": str, "source"?: "manual" | "suggestion"}"""
     data = request.json
     if not isinstance(data, dict):
         return _error("JSON body required")
     user_id = _parse_uuid(data.get("user_id"))
     list_uuid = _parse_uuid(list_id)
     name = data.get("name")
+    source = _valid_source(data.get("source", "manual"))
     if user_id is None or list_uuid is None:
         return _error("valid user_id and list id (uuid) are required")
     if not isinstance(name, str) or not name.strip():
         return _error("name is required")
-    item = await db.add_item(user_id, list_uuid, name.strip())
+    if source is None:
+        return _error(f"source must be one of {', '.join(db.SOURCES)}")
+    item = await db.add_item(user_id, list_uuid, name.strip(), source)
     if item is None:
         return _error("list not found", 404)
     return json({"status": "success", "item": item}, status=201)
@@ -157,6 +186,54 @@ async def update_item(request, item_id):
     if item is None:
         return _error("item not found", 404)
     return json({"status": "success", "item": item})
+
+
+@bp.get("/recommendations/repurchase")
+async def repurchase_suggestions(request):
+    """Due re-purchase Suggestions, computed on read (PRD 02 §4a)."""
+    user_id = _parse_uuid(request.args.get("user_id"))
+    if user_id is None:
+        return _error("valid user_id (uuid) is required")
+    found = await db.get_repurchase_suggestions(user_id)
+    return json({"status": "success", **found})
+
+
+def _clean_suggestion(raw):
+    """The Suggestion as shown, with its Item name normalized, or None if invalid."""
+    if not isinstance(raw, dict) or raw.get("type") != SUGGESTION_TYPE:
+        return None
+    payload, reason, score = raw.get("payload"), raw.get("reason"), raw.get("score")
+    if not isinstance(payload, dict) or not isinstance(reason, str):
+        return None
+    if isinstance(score, bool) or not isinstance(score, (int, float)):
+        return None
+    name = payload.get("item_name")
+    if not isinstance(name, str) or not name.strip():
+        return None
+    payload = {**payload, "item_name": normalize_item_name(name)}
+    return {"type": SUGGESTION_TYPE, "payload": payload, "reason": reason, "score": score}
+
+
+@bp.post("/recommendations/outcomes")
+async def create_outcome(request):
+    """Body: {"user_id": uuid, "action": "accepted" | "dismissed", "suggestion": {...}}
+
+    `suggestion` is the `{type, payload, reason, score}` the Shopper saw.
+    """
+    data = request.json
+    if not isinstance(data, dict):
+        return _error("JSON body required")
+    user_id = _parse_uuid(data.get("user_id"))
+    action = data.get("action")
+    suggestion = _clean_suggestion(data.get("suggestion"))
+    if user_id is None:
+        return _error("valid user_id (uuid) is required")
+    if action not in OUTCOME_ACTIONS:
+        return _error(f"action must be one of {', '.join(OUTCOME_ACTIONS)}")
+    if suggestion is None:
+        return _error("suggestion must be a repurchase {type, payload, reason, score}")
+    outcome = await db.record_outcome(user_id, suggestion, action)
+    return json({"status": "success", "outcome": outcome}, status=201)
 
 
 app.blueprint(bp)
