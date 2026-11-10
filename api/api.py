@@ -62,18 +62,42 @@ def _parse_uuid(value):
         return None
 
 
+def _valid_source(value):
+    return value if value in db.SOURCES else None
+
+
 def _clean_items(raw):
-    """Return a list of non-empty stripped names, or None if invalid."""
+    """Return `(name, source)` pairs with blank names dropped, or None if invalid.
+
+    Each entry is a name string (source `manual`) or `{"name": str, "source": str}`.
+    """
     if raw is None:
         return []
-    if not isinstance(raw, list) or not all(isinstance(i, str) for i in raw):
+    if not isinstance(raw, list):
         return None
-    return [i.strip() for i in raw if i.strip()]
+    cleaned = []
+    for entry in raw:
+        if isinstance(entry, str):
+            name, source = entry, "manual"
+        elif isinstance(entry, dict):
+            name, source = entry.get("name"), _valid_source(entry.get("source", "manual"))
+            if source is None:
+                return None
+        else:
+            return None
+        if not isinstance(name, str):
+            return None
+        if name.strip():
+            cleaned.append((name.strip(), source))
+    return cleaned
 
 
 @bp.post("/lists")
 async def save_list(request):
-    """Save a generated list. Body: {"user_id": uuid, "title": str, "items": [str]}"""
+    """Save a generated list.
+
+    Body: {"user_id": uuid, "title": str, "items": [str | {"name": str, "source": str}]}
+    """
     data = request.json
     if not isinstance(data, dict):
         return _error("JSON body required")
@@ -85,7 +109,7 @@ async def save_list(request):
     if not isinstance(title, str) or not title.strip():
         return _error("title is required")
     if items is None:
-        return _error("items must be a list of strings")
+        return _error("items must be a list of names or {name, source} objects")
     created = await db.create_list(user_id, title.strip(), items)
     return json({"status": "success", "list": created}, status=201)
 
@@ -123,18 +147,21 @@ async def remove_list(request, list_id):
 
 @bp.post("/lists/<list_id:str>/items")
 async def create_item(request, list_id):
-    """Body: {"user_id": uuid, "name": str}"""
+    """Body: {"user_id": uuid, "name": str, "source"?: "manual" | "suggestion"}"""
     data = request.json
     if not isinstance(data, dict):
         return _error("JSON body required")
     user_id = _parse_uuid(data.get("user_id"))
     list_uuid = _parse_uuid(list_id)
     name = data.get("name")
+    source = _valid_source(data.get("source", "manual"))
     if user_id is None or list_uuid is None:
         return _error("valid user_id and list id (uuid) are required")
     if not isinstance(name, str) or not name.strip():
         return _error("name is required")
-    item = await db.add_item(user_id, list_uuid, name.strip())
+    if source is None:
+        return _error(f"source must be one of {', '.join(db.SOURCES)}")
+    item = await db.add_item(user_id, list_uuid, name.strip(), source)
     if item is None:
         return _error("list not found", 404)
     return json({"status": "success", "item": item}, status=201)

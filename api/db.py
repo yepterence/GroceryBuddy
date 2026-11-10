@@ -10,10 +10,14 @@ import uuid
 import asyncpg
 from dotenv import load_dotenv
 
+from items import normalize_item_name
 from trends import Trend
 
 DOTENV_PATH = pathlib.Path(__file__).resolve().parents[1] / ".env"
 load_dotenv(DOTENV_PATH)
+
+# Allowed list_inclusion.source values (ADR 0003); mirrors the CHECK in db/schema.sql.
+SOURCES = ("manual", "suggestion")
 
 _pool = None
 
@@ -115,14 +119,15 @@ async def update_item_trend(user_id, item_name, conn=None):
             return await _update_item_trend_on_conn(acquired, user_id, item_name)
 
 
-async def create_list(user_id, title, item_names):
+async def create_list(user_id, title, items):
     """Create a list with its items in one transaction.
 
+    `items` is a sequence of `(name, source)` pairs, `source` being one of `SOURCES`.
     Also ensures the user exists, appends a list_inclusion row per item,
     and updates item_trend.
     """
     list_id = uuid.uuid4()
-    items = []
+    saved = []
     async with _get_pool().acquire() as conn:
         async with conn.transaction():
             await conn.execute(
@@ -132,20 +137,21 @@ async def create_list(user_id, title, item_names):
                 "INSERT INTO grocery_list (id, user_id, title) VALUES ($1, $2, $3)",
                 list_id, user_id, title,
             )
-            for name in item_names:
+            for name, source in items:
                 row = await conn.fetchrow(
                     "INSERT INTO needed_item (id, user_id, list_id, name) "
                     "VALUES ($1, $2, $3, $4) RETURNING id, name, checked, created_at",
                     uuid.uuid4(), user_id, list_id, name,
                 )
+                key = normalize_item_name(name)
                 await conn.execute(
-                    "INSERT INTO list_inclusion (id, user_id, item_name, list_id) "
-                    "VALUES ($1, $2, $3, $4)",
-                    uuid.uuid4(), user_id, name, list_id,
+                    "INSERT INTO list_inclusion (id, user_id, item_name, list_id, source) "
+                    "VALUES ($1, $2, $3, $4, $5)",
+                    uuid.uuid4(), user_id, key, list_id, source,
                 )
-                await update_item_trend(user_id, name, conn=conn)
-                items.append(_item_row(row))
-    return {"id": str(list_id), "user_id": str(user_id), "title": title, "items": items}
+                await update_item_trend(user_id, key, conn=conn)
+                saved.append(_item_row(row))
+    return {"id": str(list_id), "user_id": str(user_id), "title": title, "items": saved}
 
 
 async def get_lists(user_id):
@@ -185,7 +191,7 @@ async def get_list(user_id, list_id):
     return {"id": str(l["id"]), "title": l["title"], "items": [_item_row(r) for r in items]}
 
 
-async def add_item(user_id, list_id, name):
+async def add_item(user_id, list_id, name, source="manual"):
     """Add an item to an existing list. Returns the item, or None if the list is missing."""
     async with _get_pool().acquire() as conn:
         async with conn.transaction():
@@ -199,12 +205,13 @@ async def add_item(user_id, list_id, name):
                 "VALUES ($1, $2, $3, $4) RETURNING id, name, checked, created_at",
                 uuid.uuid4(), user_id, list_id, name,
             )
+            key = normalize_item_name(name)
             await conn.execute(
-                "INSERT INTO list_inclusion (id, user_id, item_name, list_id) "
-                "VALUES ($1, $2, $3, $4)",
-                uuid.uuid4(), user_id, name, list_id,
+                "INSERT INTO list_inclusion (id, user_id, item_name, list_id, source) "
+                "VALUES ($1, $2, $3, $4, $5)",
+                uuid.uuid4(), user_id, key, list_id, source,
             )
-            await update_item_trend(user_id, name, conn=conn)
+            await update_item_trend(user_id, key, conn=conn)
     return _item_row(row)
 
 

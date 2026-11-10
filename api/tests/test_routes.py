@@ -2,6 +2,23 @@
 
 import uuid
 
+import asyncpg
+
+from conftest import TEST_DATABASE_URL
+
+
+async def inclusion_sources(list_id):
+    # Own connection: the test client closes the app's pool when its server stops.
+    conn = await asyncpg.connect(TEST_DATABASE_URL)
+    try:
+        rows = await conn.fetch(
+            "SELECT item_name, source FROM list_inclusion WHERE list_id = $1",
+            uuid.UUID(list_id),
+        )
+    finally:
+        await conn.close()
+    return {r["item_name"]: r["source"] for r in rows}
+
 
 async def create_list(client, user_id, title="Weekly", items=("milk", "eggs")):
     _, resp = await client.post(
@@ -37,6 +54,18 @@ async def test_create_list_strips_whitespace_and_drops_blank_items(client, user_
     assert [i["name"] for i in saved["items"]] == ["chips", "salsa"]
 
 
+async def test_create_list_accepts_names_and_name_source_objects(client, user_id):
+    items = ["milk", {"name": " eggs ", "source": "suggestion"}, {"name": "bread"}]
+    saved = await create_list(client, user_id, items=items)
+    assert [i["name"] for i in saved["items"]] == ["milk", "eggs", "bread"]
+
+    assert await inclusion_sources(saved["id"]) == {
+        "milk": "manual",
+        "eggs": "suggestion",
+        "bread": "manual",
+    }
+
+
 async def test_create_list_without_items_is_allowed(client, user_id):
     _, resp = await client.post("/lists", json={"user_id": user_id, "title": "Empty"})
     assert resp.status == 201
@@ -59,6 +88,9 @@ async def test_create_list_rejects_bad_input(client, user_id):
         {"user_id": user_id, "title": 123},
         {"user_id": user_id, "title": "x", "items": "milk"},  # not a list
         {"user_id": user_id, "title": "x", "items": ["milk", 5]},  # non-string item
+        {"user_id": user_id, "title": "x", "items": [{"name": "milk", "source": "recipe"}]},
+        {"user_id": user_id, "title": "x", "items": [{"source": "manual"}]},  # no name
+        {"user_id": user_id, "title": "x", "items": [{"name": 5}]},
     ]
     for payload in cases:
         _, resp = await client.post("/lists", json=payload)
@@ -145,6 +177,16 @@ async def test_add_item_appends_to_list(client, user_id):
     assert [i["name"] for i in resp.json["list"]["items"]] == ["milk", "cheese"]
 
 
+async def test_add_item_records_accepted_suggestion_source(client, user_id):
+    saved = await create_list(client, user_id, items=[])
+    _, resp = await client.post(
+        f"/lists/{saved['id']}/items",
+        json={"user_id": user_id, "name": "oat milk", "source": "suggestion"},
+    )
+    assert resp.status == 201
+    assert await inclusion_sources(saved["id"]) == {"oat milk": "suggestion"}
+
+
 async def test_add_item_404_for_unknown_or_foreign_list(client, user_id):
     _, resp = await client.post(
         f"/lists/{uuid.uuid4()}/items", json={"user_id": user_id, "name": "milk"}
@@ -168,6 +210,8 @@ async def test_add_item_rejects_bad_input(client, user_id):
         {"user_id": user_id, "name": 7},
         {"name": "milk"},
         {"user_id": "bad", "name": "milk"},
+        {"user_id": user_id, "name": "milk", "source": "recipe"},
+        {"user_id": user_id, "name": "milk", "source": None},
     ]:
         _, resp = await client.post(path, json=payload)
         assert resp.status == 400, payload

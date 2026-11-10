@@ -23,12 +23,14 @@ CREATE TABLE IF NOT EXISTS needed_item (
 
 -- Append-only. Written when an item is added to a list, not when it is checked off.
 -- list_id becomes null if that list is later deleted so the history row survives.
+-- source: typed by the Shopper, or an accepted Suggestion. Both count toward Cadence (ADR 0003).
 CREATE TABLE IF NOT EXISTS list_inclusion (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES "user" (id) ON DELETE CASCADE,
     item_name TEXT NOT NULL,
     list_id UUID REFERENCES grocery_list (id) ON DELETE SET NULL,
-    included_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    included_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    source TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'suggestion'))
 );
 
 -- Derived cache. Recomputable from list_inclusion. Null cadence until a second inclusion.
