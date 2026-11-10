@@ -3,6 +3,7 @@
 All queries are scoped by user_id, the anonymous tenant key. Requires DATABASE_URL.
 """
 
+import json
 import os
 import pathlib
 import uuid
@@ -11,6 +12,7 @@ import asyncpg
 from dotenv import load_dotenv
 
 from items import normalize_item_name
+from suggestions import due_suggestions
 from trends import Trend
 
 DOTENV_PATH = pathlib.Path(__file__).resolve().parents[1] / ".env"
@@ -224,6 +226,76 @@ async def set_item_checked(user_id, item_id, checked):
             item_id, user_id, checked,
         )
     return _item_row(row) if row else None
+
+
+async def get_repurchase_suggestions(user_id, now=None):
+    """Due Suggestions (PRD 02 §4a) and the Shopper's known Item names.
+
+    Open items (F3) and Items dismissed since their last Inclusion are excluded.
+    """
+    async with _get_pool().acquire() as conn:
+        trend_rows = await conn.fetch(
+            "SELECT item_name, inclusion_count, cadence_days, last_included_at, next_due_at "
+            "FROM item_trend WHERE user_id = $1",
+            user_id,
+        )
+        open_rows = await conn.fetch(
+            "SELECT DISTINCT name FROM needed_item WHERE user_id = $1 AND NOT checked",
+            user_id,
+        )
+        dismissed_rows = await conn.fetch(
+            "SELECT r.payload_json->>'item_name' AS item_name, max(o.occurred_at) AS at "
+            "FROM recommendation r JOIN recommendation_outcome o ON o.recommendation_id = r.id "
+            "WHERE r.user_id = $1 AND o.action = 'dismissed' "
+            "GROUP BY 1",
+            user_id,
+        )
+    trends = [
+        Trend(
+            item_name=r["item_name"],
+            inclusion_count=r["inclusion_count"],
+            last_included_at=r["last_included_at"],
+            cadence_days=float(r["cadence_days"]) if r["cadence_days"] is not None else None,
+            next_due_at=r["next_due_at"],
+        )
+        for r in trend_rows
+    ]
+    # needed_item keeps the typed name for display (ADR 0001), so normalize here.
+    open_items = {normalize_item_name(r["name"]) for r in open_rows}
+    dismissed_at = {r["item_name"]: r["at"] for r in dismissed_rows}
+    return {
+        "suggestions": due_suggestions(trends, open_items, dismissed_at, now=now),
+        "known_item_names": sorted(t.item_name for t in trends),
+    }
+
+
+async def record_outcome(user_id, suggestion, action):
+    """Store the Suggestion the Shopper saw and what they did with it."""
+    async with _get_pool().acquire() as conn:
+        async with conn.transaction():
+            await conn.execute(
+                'INSERT INTO "user" (id) VALUES ($1) ON CONFLICT DO NOTHING', user_id
+            )
+            recommendation_id = uuid.uuid4()
+            await conn.execute(
+                "INSERT INTO recommendation (id, user_id, type, payload_json, reason, score) "
+                "VALUES ($1, $2, $3, $4::jsonb, $5, $6)",
+                recommendation_id,
+                user_id,
+                suggestion["type"],
+                json.dumps(suggestion["payload"]),
+                suggestion["reason"],
+                float(suggestion["score"]),
+            )
+            outcome_id = uuid.uuid4()
+            await conn.execute(
+                "INSERT INTO recommendation_outcome (id, recommendation_id, action) "
+                "VALUES ($1, $2, $3)",
+                outcome_id,
+                recommendation_id,
+                action,
+            )
+    return {"id": str(outcome_id), "recommendation_id": str(recommendation_id), "action": action}
 
 
 async def delete_list(user_id, list_id):

@@ -9,7 +9,9 @@ from sanic import Blueprint
 from sanic.response import json
 
 import db
+from items import normalize_item_name
 from scraper import Scraper
+from suggestions import OUTCOME_ACTIONS, SUGGESTION_TYPE
 
 bp = Blueprint("lists_blueprint")
 app = Sanic("grocery_buddy_server")
@@ -184,6 +186,54 @@ async def update_item(request, item_id):
     if item is None:
         return _error("item not found", 404)
     return json({"status": "success", "item": item})
+
+
+@bp.get("/recommendations/repurchase")
+async def repurchase_suggestions(request):
+    """Due re-purchase Suggestions, computed on read (PRD 02 §4a)."""
+    user_id = _parse_uuid(request.args.get("user_id"))
+    if user_id is None:
+        return _error("valid user_id (uuid) is required")
+    found = await db.get_repurchase_suggestions(user_id)
+    return json({"status": "success", **found})
+
+
+def _clean_suggestion(raw):
+    """The Suggestion as shown, with its Item name normalized, or None if invalid."""
+    if not isinstance(raw, dict) or raw.get("type") != SUGGESTION_TYPE:
+        return None
+    payload, reason, score = raw.get("payload"), raw.get("reason"), raw.get("score")
+    if not isinstance(payload, dict) or not isinstance(reason, str):
+        return None
+    if isinstance(score, bool) or not isinstance(score, (int, float)):
+        return None
+    name = payload.get("item_name")
+    if not isinstance(name, str) or not name.strip():
+        return None
+    payload = {**payload, "item_name": normalize_item_name(name)}
+    return {"type": SUGGESTION_TYPE, "payload": payload, "reason": reason, "score": score}
+
+
+@bp.post("/recommendations/outcomes")
+async def create_outcome(request):
+    """Body: {"user_id": uuid, "action": "accepted" | "dismissed", "suggestion": {...}}
+
+    `suggestion` is the `{type, payload, reason, score}` the Shopper saw.
+    """
+    data = request.json
+    if not isinstance(data, dict):
+        return _error("JSON body required")
+    user_id = _parse_uuid(data.get("user_id"))
+    action = data.get("action")
+    suggestion = _clean_suggestion(data.get("suggestion"))
+    if user_id is None:
+        return _error("valid user_id (uuid) is required")
+    if action not in OUTCOME_ACTIONS:
+        return _error(f"action must be one of {', '.join(OUTCOME_ACTIONS)}")
+    if suggestion is None:
+        return _error("suggestion must be a repurchase {type, payload, reason, score}")
+    outcome = await db.record_outcome(user_id, suggestion, action)
+    return json({"status": "success", "outcome": outcome}, status=201)
 
 
 app.blueprint(bp)

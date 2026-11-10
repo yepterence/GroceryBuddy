@@ -1,9 +1,11 @@
 """HTTP-level tests for the grocery list CRUD routes (api/api.py)."""
 
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import asyncpg
 
+import db
 from conftest import TEST_DATABASE_URL
 
 
@@ -307,3 +309,149 @@ async def test_delete_list_400_for_invalid_ids(client, user_id):
     assert resp.status == 400
     _, resp = await client.delete(f"/lists/{uuid.uuid4()}")
     assert resp.status == 400
+
+
+# --- Suggestions: GET /recommendations/repurchase, POST /recommendations/outcomes
+
+
+async def seed_history(user_id, item_name, *days_ago):
+    """Backdated Additions of one Item, with its item_trend recomputed."""
+    now = datetime.now(timezone.utc)
+    conn = await asyncpg.connect(TEST_DATABASE_URL)
+    try:
+        uid = uuid.UUID(user_id)
+        await conn.execute('INSERT INTO "user" (id) VALUES ($1) ON CONFLICT DO NOTHING', uid)
+        for days in days_ago:
+            await conn.execute(
+                "INSERT INTO list_inclusion (id, user_id, item_name, included_at) "
+                "VALUES ($1, $2, $3, $4)",
+                uuid.uuid4(), uid, item_name, now - timedelta(days=days),
+            )
+        await db._update_item_trend_on_conn(conn, uid, item_name)
+    finally:
+        await conn.close()
+
+
+async def suggested(client, user_id):
+    _, resp = await client.get("/recommendations/repurchase", params={"user_id": user_id})
+    assert resp.status == 200, resp.text
+    return resp.json
+
+
+def suggested_names(body):
+    return [s["payload"]["item_name"] for s in body["suggestions"]]
+
+
+async def test_repurchase_returns_due_items_only(client, user_id):
+    await seed_history(user_id, "oat milk", 21, 14, 7)  # cadence 7, 7 days since: due
+    await seed_history(user_id, "rice", 30, 1)  # cadence 29, 1 day since: not due
+    await seed_history(user_id, "candles", 40)  # one Inclusion: not a habit
+
+    body = await suggested(client, user_id)
+
+    assert suggested_names(body) == ["oat milk"]
+    [s] = body["suggestions"]
+    assert s["type"] == "repurchase"
+    assert s["reason"] == "You've added oat milk to a list 3x; last time 7d ago."
+    assert body["known_item_names"] == ["candles", "oat milk", "rice"]
+
+
+async def test_repurchase_skips_open_items(client, user_id):
+    await seed_history(user_id, "oat milk", 21, 14, 7)
+    await seed_history(user_id, "eggs", 21, 14, 7)
+    await create_list(client, user_id, items=["Oat  Milk"])  # unchecked: Open
+
+    assert "oat milk" not in suggested_names(await suggested(client, user_id))
+
+
+async def test_repurchase_sorts_by_score_and_caps_at_five(client, user_id):
+    for i in range(7):
+        await seed_history(user_id, f"item {i}", *[7 * k + i for k in range(i + 2, 0, -1)])
+
+    body = await suggested(client, user_id)
+
+    scores = [s["score"] for s in body["suggestions"]]
+    assert len(scores) == 5
+    assert scores == sorted(scores, reverse=True)
+
+
+async def test_repurchase_requires_valid_user_id(client):
+    _, resp = await client.get("/recommendations/repurchase")
+    assert resp.status == 400
+    _, resp = await client.get("/recommendations/repurchase", params={"user_id": "nope"})
+    assert resp.status == 400
+
+
+async def test_dismissal_hides_item_until_the_shopper_adds_it_again(client, user_id):
+    await seed_history(user_id, "oat milk", 21, 14, 7)
+    [shown] = (await suggested(client, user_id))["suggestions"]
+
+    _, resp = await client.post(
+        "/recommendations/outcomes",
+        json={"user_id": user_id, "action": "dismissed", "suggestion": shown},
+    )
+    assert resp.status == 201, resp.text
+    assert suggested_names(await suggested(client, user_id)) == []
+
+    # A dismissal older than the Item's last Inclusion no longer applies.
+    conn = await asyncpg.connect(TEST_DATABASE_URL)
+    try:
+        await conn.execute(
+            "UPDATE recommendation_outcome SET occurred_at = now() - interval '10 days' "
+            "WHERE recommendation_id IN (SELECT id FROM recommendation WHERE user_id = $1)",
+            uuid.UUID(user_id),
+        )
+    finally:
+        await conn.close()
+    assert suggested_names(await suggested(client, user_id)) == ["oat milk"]
+
+
+async def test_accepted_outcome_stores_what_the_shopper_saw(client, user_id):
+    await seed_history(user_id, "oat milk", 21, 14, 7)
+    [shown] = (await suggested(client, user_id))["suggestions"]
+
+    _, resp = await client.post(
+        "/recommendations/outcomes",
+        json={"user_id": user_id, "action": "accepted", "suggestion": shown},
+    )
+    assert resp.status == 201
+    conn = await asyncpg.connect(TEST_DATABASE_URL)
+    try:
+        row = await conn.fetchrow(
+            "SELECT r.type, r.payload_json->>'item_name' AS item_name, r.reason, r.score, "
+            "o.action FROM recommendation r "
+            "JOIN recommendation_outcome o ON o.recommendation_id = r.id WHERE r.user_id = $1",
+            uuid.UUID(user_id),
+        )
+    finally:
+        await conn.close()
+    assert dict(row) == {
+        "type": "repurchase",
+        "item_name": "oat milk",
+        "reason": shown["reason"],
+        "score": shown["score"],
+        "action": "accepted",
+    }
+    # Accepting is not a dismissal: the GET still applies only due-ness and Open items.
+    assert suggested_names(await suggested(client, user_id)) == ["oat milk"]
+
+
+async def test_outcome_rejects_bad_input(client, user_id):
+    good = {
+        "type": "repurchase",
+        "payload": {"item_name": "milk"},
+        "reason": "because",
+        "score": 0.5,
+    }
+    cases = [
+        {"action": "dismissed", "suggestion": good},  # no user_id
+        {"user_id": user_id, "action": "ignored", "suggestion": good},
+        {"user_id": user_id, "action": "dismissed"},
+        {"user_id": user_id, "action": "dismissed", "suggestion": {**good, "type": "recipe"}},
+        {"user_id": user_id, "action": "dismissed", "suggestion": {**good, "payload": {}}},
+        {"user_id": user_id, "action": "dismissed", "suggestion": {**good, "score": "high"}},
+        {"user_id": user_id, "action": "dismissed", "suggestion": {**good, "score": True}},
+    ]
+    for payload in cases:
+        _, resp = await client.post("/recommendations/outcomes", json=payload)
+        assert resp.status == 400, payload
