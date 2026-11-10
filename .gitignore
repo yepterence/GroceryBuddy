@@ -33,4 +33,5 @@ gb-api/
 # Projectdata
 data/
 devlog/
+.scratch/
 *.zip

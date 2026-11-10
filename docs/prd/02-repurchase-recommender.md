@@ -109,7 +109,17 @@ it is recomputed when a list is shown.
 **How many.** At most 5, highest score first, and only Items that are due: `days_since >= 0.8 ×
 cadence_days`. Tune the 0.8 and the 5 from acceptance data.
 
-**Dismissals.** Stored as an outcome on the suggestion the Shopper saw. A dismissed Item is
+**Presentation (decided 2026-11-10).** One Suggestion at a time, in the empty Item slot, with
+its reason. Accepting adds that one Item, and the next due Suggestion takes the empty slot,
+so accepting N times adds N Items. The bubble never lists several Items, and one tap never
+adds several (see §11). Starting to type in the slot dismisses the shown Suggestion; the typed
+text stays, and the next Suggestion appears once the slot is empty again. After 10 seconds
+with no action the bubble collapses to a chip, which is not a dismissal: clicking the chip
+brings the same Suggestion back and restarts the 10 seconds. Saving or leaving the list does
+not dismiss Suggestions the Shopper left alone; they stay due.
+
+**Dismissals.** Stored as an outcome on the suggestion the Shopper saw. The Shopper dismisses
+with the dismiss control (button or swipe) or by typing over the Suggestion. A dismissed Item is
 not suggested again until the Shopper adds it to a list themselves (its next Inclusion).
 Dismissal is a clear "no"; the way back is the Shopper's own add, or later a price offer (F7).
 
@@ -168,6 +178,8 @@ every outcome points at exactly what they saw. Decided 2026-11-02.
   the optional purchase signal?
 - F3 uses Open items, not "active lists" (decided 2026-11-02). An item left unchecked after
   it was bought stays Open and blocks its own recommendations indefinitely. See §10.
+- Is a lasting dismissal on typing too strong for an Item that just does not belong on this
+  list? See §11.
 
 ## 10. Deferred: Handling Missed Check-offs
 
@@ -218,3 +230,32 @@ possible later `receipt` source.
 
 - Thresholds for "most of a list checked" (phase 1) and for staleness (phase 3).
 - Whether a resolved-as-purchased item is auto-checked, hidden, or removed from its list.
+
+## 11. Deferred: Several Suggestions in One Bubble
+
+> Status: rejected for v1 (decided 2026-11-10). v1 shows one Suggestion at a time (§4a).
+
+### Problem
+
+A set of due Items is often mixed: oat milk belongs on this list, and candles do not. A
+bubble that holds the whole set has no honest gesture:
+
+- **Accept the bubble.** Every Item lands on the list, including the ones that do not
+  belong. The Shopper deletes them by hand, and each accepted Item still counts toward
+  Cadence (`source = suggestion`, ADR 0003), so wrong accepts distort the habit data.
+- **Dismiss the bubble.** The relevant Items go away with the irrelevant ones, and each
+  dismissal is lasting: those Items stay hidden until the Shopper adds them themselves.
+- **Per-item controls inside the bubble.** That is several Suggestions sharing one
+  container, which is the one-at-a-time queue with more on screen.
+
+### Decision
+
+Do not ship a bubble that accepts or dismisses a set as a whole. If several Items are ever
+shown together, each must be accepted or passed over on its own.
+
+### Open questions
+
+- v1 moves past the shown Item only by accepting it or by a lasting dismissal (the control or
+  typing over it). "Not on this list" is a weaker answer than "stop suggesting this." If
+  dismissal data shows Shoppers rejecting Items that are genuinely due, add a skip that
+  advances to the next Suggestion for this visit and writes no outcome.

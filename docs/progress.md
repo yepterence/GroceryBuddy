@@ -11,9 +11,9 @@ this file tracks what is actually done. Status key: ✅ done · 🟡 partial / u
 | Postgres schema (PRD 01) | ✅ | `db/schema.sql`, idempotent |
 | List persistence API (PRD 01) | ✅ | CRUD routes + `api/db.py` |
 | Database in Docker | ✅ | `docker-compose.yml` (app + test services) |
-| Automated tests | ✅ | Run against a real Postgres (`./scripts/test.sh`); last full run 2026-11-06 (118 passed, 1 skipped) |
+| Automated tests | ✅ | Run against a real Postgres (`./scripts/test.sh`); last full run 2026-11-10 (131 passed, 1 skipped; frontend 64 passed) |
 | Frontend ↔ API integration | 🟡 | `src/requests.ts` wired into the create form and dashboard; unit-tested with mocked `fetch`, **not yet tried in a browser against the live API** |
-| Re-purchase recommender (PRD 02) | 🟡 | `item_trend`, scoring and eligibility built; design decided (ADRs 0001/0003, Open items, grocery intent); no suggestion endpoint, feed or UI yet |
+| Re-purchase recommender (PRD 02) | 🟡 | `GET /recommendations/repurchase`, outcome recording and the one-at-a-time Suggestion bubble on the create form are built (2026-11-10); grocery intent and suggestions on saved lists not yet; not tried in a browser |
 | AI capture + nutrition (PRD 03) | ⬜ | |
 | Recommendation framework (PRD 04) | ⬜ | |
 | Auth / production gate | ⬜ | Blocker before production, see below |
@@ -28,6 +28,7 @@ this file tracks what is actually done. Status key: ✅ done · 🟡 partial / u
 - [x] ADR 0001 item identity by normalized name, ADR 0002 anonymous device-bound Shopper, ADR 0003 accepted suggestions count toward cadence
 - [x] `GLOSSARY.md`: domain terms (Shopper, Item, Addition, Inclusion, Cadence, Open item, Suggestion, grocery intent)
 - [x] PRD 02 amended: Open items (F3), suggestions inside the list being built (F4, §4a grocery intent), computed-on-read suggestions, deferred missed check-off handling (§10)
+- [x] PRD 02 amended (2026-11-10): one-at-a-time presentation and typing-over-dismisses (§4a); multi-item bubble rejected (§11)
 
 ### Database (`db/`, `scripts/`)
 - [x] Schema: `user`, `grocery_list`, `needed_item`, `list_inclusion` (append-only), `item_trend` (derived cache), plus 4 indexes
@@ -66,8 +67,9 @@ this file tracks what is actually done. Status key: ✅ done · 🟡 partial / u
 - [x] Update `item_trend` from `list_inclusion` (`api/trends.py` + `db.update_item_trend`: median `cadence_days`, `next_due_at`, 12-hour session deduplication, `inclusion_count >= 2` eligibility, and frequency + recency `calculate_score`; trade-offs documented in `docs/tradeoffs.md`)
 - [x] Implement ADR 0001: normalize item names (lowercase, collapse whitespace) when an addition is recorded; `needed_item.name` keeps what was typed (`api/items.py`, used by `create_list` and `add_item`, 2026-11-05; DB tests passed 2026-11-06). Local data written before this must be reset with `docker compose down -v`
 - [x] Implement ADR 0003: `source` column on `list_inclusion` (`manual` | `suggestion`, NOT NULL, default `manual`). `POST /lists` takes items as names or `{name, source}`; `POST /lists/<id>/items` takes an optional `source`. Accepted suggestions still count toward `item_trend` (2026-11-06). Existing databases need `ALTER TABLE list_inclusion ADD COLUMN source TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'suggestion'))` or a reset
-- [ ] PRD 02: `GET /recommendations/repurchase` computed on read from `item_trend`, excluding Open items (F3)
-- [ ] PRD 02: grocery-intent score (§4a) and suggestions inside the list being built (F4), with outcome recording (F5)
+- [x] PRD 02: `GET /recommendations/repurchase` computed on read from `item_trend` (`api/suggestions.py`): due at 0.8 × cadence, Open items (F3) and standing dismissals excluded, top 5 (2026-11-10)
+- [x] PRD 02: Suggestion bubble in the create form (F4, §4a presentation) with outcome recording (F5) via `POST /recommendations/outcomes` and the `recommendation` / `recommendation_outcome` tables (2026-11-10). Existing databases need the two new tables (`scripts/create-tables.sh` adds them). Tickets in `.scratch/repurchase-suggestions/issues/`
+- [ ] PRD 02: grocery-intent score (§4a) replacing the 2-Item gate, and suggestions on saved lists (F4)
 - [x] ~~Decide source and list-purpose signals~~ Source decided in ADR 0003; list purpose replaced by inferred grocery intent (PRD 02 §4a, 2026-11-04)
 - [ ] Decide on duplicate handling for repeated additions (`docs/tradeoffs.md` section 3); per-purpose cadence still open
 - [ ] PRD 03: AI capture and nutrition (thin)
