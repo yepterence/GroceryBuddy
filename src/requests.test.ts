@@ -5,7 +5,9 @@ import {
   createList,
   fetchList,
   fetchLists,
+  fetchRepurchaseSuggestions,
   getUserId,
+  recordOutcome,
   removeList,
   setItemChecked,
 } from "./requests";
@@ -55,10 +57,13 @@ describe("requests", () => {
   });
 
   describe("createList", () => {
-    it("POSTs the title, item names and user id, and maps items to contents", async () => {
+    it("POSTs the title, items with their source and user id, and maps items to contents", async () => {
       fetchMock.mockResolvedValue(jsonResponse({ status: "success", list: apiList }, 201));
 
-      const list = await createList("Weekly", ["Milk"]);
+      const list = await createList("Weekly", [
+        { name: "Milk", source: "manual" },
+        { name: "oat milk", source: "suggestion" },
+      ]);
 
       const sent = call();
       expect(sent.url).toBe("/api/lists");
@@ -66,7 +71,10 @@ describe("requests", () => {
       expect(sent.body).toEqual({
         user_id: getUserId(),
         title: "Weekly",
-        items: ["Milk"],
+        items: [
+          { name: "Milk", source: "manual" },
+          { name: "oat milk", source: "suggestion" },
+        ],
       });
       expect(list).toEqual({
         id: "list-1",
@@ -148,6 +156,60 @@ describe("requests", () => {
       expect(call().method).toBe("POST");
       expect(call().body).toEqual({ user_id: getUserId(), name: "Cheese" });
       expect(item).toEqual({ id: "item-9", name: "Cheese", checked: false });
+    });
+  });
+
+  describe("fetchRepurchaseSuggestions", () => {
+    it("GETs due Suggestions and the known Item names for this user", async () => {
+      const suggestion = {
+        type: "repurchase",
+        payload: { item_name: "oat milk", inclusion_count: 3 },
+        reason: "You've added oat milk to a list 3x; last time 7d ago.",
+        score: 0.8,
+      };
+      fetchMock.mockResolvedValue(
+        jsonResponse({
+          status: "success",
+          suggestions: [suggestion],
+          known_item_names: ["oat milk", "rice"],
+        }),
+      );
+
+      const found = await fetchRepurchaseSuggestions();
+
+      expect(call().url).toBe(`/api/recommendations/repurchase?user_id=${getUserId()}`);
+      expect(found).toEqual({
+        suggestions: [suggestion],
+        knownItemNames: ["oat milk", "rice"],
+      });
+    });
+  });
+
+  describe("recordOutcome", () => {
+    it("POSTs the action with the Suggestion the Shopper saw", async () => {
+      const suggestion = {
+        type: "repurchase" as const,
+        payload: {
+          item_name: "oat milk",
+          inclusion_count: 3,
+          last_included_at: "2026-11-03T12:00:00+00:00",
+          cadence_days: 7,
+          next_due_at: "2026-11-10T12:00:00+00:00",
+        },
+        reason: "because",
+        score: 0.8,
+      };
+      fetchMock.mockResolvedValue(jsonResponse({ status: "success" }, 201));
+
+      await recordOutcome(suggestion, "dismissed");
+
+      expect(call().url).toBe("/api/recommendations/outcomes");
+      expect(call().method).toBe("POST");
+      expect(call().body).toEqual({
+        user_id: getUserId(),
+        action: "dismissed",
+        suggestion,
+      });
     });
   });
 

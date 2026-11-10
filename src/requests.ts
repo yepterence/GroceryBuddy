@@ -1,4 +1,4 @@
-import { GroceryList, Item } from "./types";
+import { GroceryList, Item, ItemSource, OutcomeAction, Suggestion } from "./types";
 
 // In dev, Vite proxies /api to the Sanic server (see vite.config.ts), so no CORS
 // setup is needed. Override with VITE_API_URL to call the API directly.
@@ -89,14 +89,14 @@ const jsonInit = (method: string, body: unknown): RequestInit => ({
 
 const userQuery = () => `user_id=${encodeURIComponent(getUserId())}`;
 
-/** POST /lists: save a list and its items. */
+/** POST /lists: save a list and its items, each with where it came from. */
 export const createList = async (
   title: string,
-  itemNames: string[],
+  items: { name: string; source: ItemSource }[],
 ): Promise<GroceryList> => {
   const data = await request<{ list: ApiList }>(
     "/lists",
-    jsonInit("POST", { user_id: getUserId(), title, items: itemNames }),
+    jsonInit("POST", { user_id: getUserId(), title, items }),
   );
   return toList(data.list);
 };
@@ -129,6 +129,29 @@ export const addItem = async (listId: string, name: string): Promise<Item> => {
     jsonInit("POST", { user_id: getUserId(), name }),
   );
   return toItem(data.item);
+};
+
+/** GET /recommendations/repurchase: due Suggestions (dismissals already applied). */
+export const fetchRepurchaseSuggestions = async (): Promise<{
+  suggestions: Suggestion[];
+  knownItemNames: string[];
+}> => {
+  const data = await request<{
+    suggestions: Suggestion[];
+    known_item_names: string[];
+  }>(`/recommendations/repurchase?${userQuery()}`);
+  return { suggestions: data.suggestions, knownItemNames: data.known_item_names };
+};
+
+/** POST /recommendations/outcomes: what the Shopper did with a Suggestion they saw. */
+export const recordOutcome = async (
+  suggestion: Suggestion,
+  action: OutcomeAction,
+): Promise<void> => {
+  await request<unknown>(
+    "/recommendations/outcomes",
+    jsonInit("POST", { user_id: getUserId(), action, suggestion }),
+  );
 };
 
 /** PATCH /items/<id>: check or uncheck an item. */

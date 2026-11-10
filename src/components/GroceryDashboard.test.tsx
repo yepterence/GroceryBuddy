@@ -13,6 +13,8 @@ vi.mock("../requests", () => ({
   fetchLists: vi.fn(),
   removeList: vi.fn(),
   setItemChecked: vi.fn(),
+  fetchRepurchaseSuggestions: vi.fn(async () => ({ suggestions: [], knownItemNames: [] })),
+  recordOutcome: vi.fn(),
 }));
 
 const weekly: GroceryList = {
@@ -210,12 +212,16 @@ describe("GroceryDashboard", () => {
     beforeEach(() => {
       server = [];
       vi.mocked(fetchLists).mockImplementation(async () => [...server]);
-      vi.mocked(createList).mockImplementation(async (title, names) => {
+      vi.mocked(createList).mockImplementation(async (title, items) => {
         const n = server.length + 1;
         const saved: GroceryList = {
           id: `list-${n}`,
           title,
-          contents: names.map((name, i) => ({ id: `item-${n}-${i}`, name, checked: false })),
+          contents: items.map(({ name }, i) => ({
+            id: `item-${n}-${i}`,
+            name,
+            checked: false,
+          })),
         };
         server.push(saved);
         return saved;
@@ -232,7 +238,9 @@ describe("GroceryDashboard", () => {
         await screen.findByRole("heading", { level: 3, name: "Saturday trip" }),
       ).toBeInTheDocument();
       expect(screen.getByRole("listitem")).toHaveTextContent("Bread");
-      expect(createList).toHaveBeenCalledWith("Saturday trip", ["Bread"]);
+      expect(createList).toHaveBeenCalledWith("Saturday trip", [
+        { name: "Bread", source: "manual" },
+      ]);
     });
 
     it("writes the new list to the local cache", async () => {
