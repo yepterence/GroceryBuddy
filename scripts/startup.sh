@@ -2,6 +2,10 @@
 # Local-dev startup: Postgres (Docker) -> tables -> API -> frontend.
 #
 #   ./scripts/startup.sh
+#   ./scripts/startup.sh --demo scripts/seed/trends.csv
+#
+# --demo seeds that CSV for a fresh Shopper, exports VITE_DEMO_USER_ID for Vite,
+# and starts the app so the UI uses the same id (no manual env or localStorage).
 #
 # Needs: docker (compose v2), python3, node/npm, and a configured .env
 # (cp .env.example .env, then set POSTGRES_PASSWORD and the matching DATABASE_URL).
@@ -13,11 +17,28 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
 
-API_PORT=3001
-venv="$root/gb-api"
-
 say() { printf '\n==> %s\n' "$*"; }
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+
+demo_file=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --demo)
+      [[ $# -ge 2 && -n "$2" && "$2" != --* ]] || die "--demo requires a seed data file"
+      demo_file="$2"
+      shift 2
+      ;;
+    *)
+      die "unknown argument: $1"
+      ;;
+  esac
+done
+if [[ -n "$demo_file" && ! -f "$demo_file" ]]; then
+  die "seed data file not found: $demo_file"
+fi
+
+API_PORT=3001
+venv="$root/gb-api"
 
 # --- 1. Preflight ---------------------------------------------------------
 say "Checking prerequisites"
@@ -80,7 +101,22 @@ if [[ ! -d node_modules || package-lock.json -nt node_modules ]]; then
   npm install
 fi
 
-# --- 6. Launch ------------------------------------------------------------
+# --- 6. Demo seed ---------------------------------------------------------
+# After the schema (step 4) and the venv (step 5), so the tables exist and
+# seed-trends.py can import the API.
+if [[ -n "$demo_file" ]]; then
+  say "Seeding demo data from $demo_file"
+  seed_log=$(mktemp)
+  "$py" scripts/seed-trends.py --new-shopper "$demo_file" | tee "$seed_log"
+  # seed-trends prints DEMO_USER_ID=…; Vite injects it as VITE_DEMO_USER_ID and
+  # getUserId() aligns the browser with the seeded Shopper.
+  VITE_DEMO_USER_ID=$(sed -n 's/^DEMO_USER_ID=//p' "$seed_log" | head -n1)
+  rm -f "$seed_log"
+  [[ -n "${VITE_DEMO_USER_ID:-}" ]] || die "seed did not report a user id"
+  export VITE_DEMO_USER_ID
+fi
+
+# --- 7. Launch ------------------------------------------------------------
 # On Ctrl-C / exit, stop everything this script started (same process group).
 trap 'trap - INT TERM EXIT; echo; echo "Stopping API and frontend..."; kill 0' INT TERM EXIT
 

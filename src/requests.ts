@@ -36,6 +36,13 @@ interface ApiList {
  * (empty) user. Real auth must replace this before production.
  */
 export const getUserId = (): string => {
+  // startup.sh --demo: seed-trends --new-shopper prints DEMO_USER_ID → Vite env.
+  // Overwrites localStorage so API calls hit the seeded data without setup.
+  const demoId = import.meta.env.VITE_DEMO_USER_ID;
+  if (typeof demoId === "string" && demoId) {
+    localStorage.setItem(USER_ID_KEY, demoId);
+    return demoId;
+  }
   let id = localStorage.getItem(USER_ID_KEY);
   if (!id) {
     // needs a secure context: https, or http on localhost.
