@@ -57,6 +57,15 @@ form button {
 .list-item { 
     list-style: none;
 }
+form li.list-item:has(.new-item-input) {
+    display: flex;
+    align-items: center;
+}
+form li .new-item-input {
+    width: auto;
+    flex: 1;
+    margin-bottom: 0;
+}
 .list-item-checked { 
     text-decoration: line-through; 
     list-style: none;

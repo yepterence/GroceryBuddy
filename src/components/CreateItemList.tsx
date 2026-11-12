@@ -1,6 +1,5 @@
 import {
   ChangeEvent,
-  SetStateAction,
   useCallback,
   useEffect,
   useState,
@@ -90,9 +89,7 @@ const CreateItemList = () => {
     nextInputRef.current?.focus();
   };
 
-  const handleTitleChange = (e: {
-    target: { value: SetStateAction<string> };
-  }) => {
+  const handleTitleChange = (e: ChangeEvent<HTMLInputElement>) => {
     setTitle(e.target.value);
   };
 
@@ -200,14 +197,27 @@ const CreateItemList = () => {
             onExpand={() => setCollapsedFor(null)}
           />
         )}
-        <input
-          type="text"
-          placeholder="New Item"
-          value={newItem}
-          onChange={handleNewItemChange}
-          onKeyDown={handleKeyDown}
-          ref={nextInputRef}
-        />
+        {title.trim() && (
+          <li className="list-item">
+            <input
+              type="checkbox"
+              checked={false}
+              disabled
+              className="input-list-checkbox"
+              aria-hidden="true"
+              tabIndex={-1}
+            />
+            <input
+              type="text"
+              className="new-item-input"
+              placeholder="New Item"
+              value={newItem}
+              onChange={handleNewItemChange}
+              onKeyDown={handleKeyDown}
+              ref={nextInputRef}
+            />
+          </li>
+        )}
         <button type="submit" onClick={handleFormSubmit} disabled={saving}>
           Add
         </button>
