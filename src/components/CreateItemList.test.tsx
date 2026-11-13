@@ -57,6 +57,15 @@ describe("CreateItemList", () => {
     offer();
   });
 
+  it("hides the new-item row until the title has text", async () => {
+    render(<CreateItemList />);
+    expect(screen.queryByPlaceholderText("New Item")).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.type(screen.getByPlaceholderText("Title"), "W");
+    expect(screen.getByPlaceholderText("New Item")).toBeInTheDocument();
+  });
+
   it("saves the list through the API and stores the server's copy", async () => {
     render(<CreateItemList />);
     const user = await fillForm();
@@ -164,6 +173,10 @@ describe("CreateItemList suggestions", () => {
   const newItemInput = () => screen.getByPlaceholderText("New Item");
 
   const addItems = async (user: ReturnType<typeof userEvent.setup>, ...names: string[]) => {
+    // The new-item row stays hidden until the list has a title.
+    if (!screen.queryByPlaceholderText("New Item")) {
+      await user.type(screen.getByPlaceholderText("Title"), "Weekly");
+    }
     for (const name of names) await user.type(newItemInput(), `${name}{Enter}`);
   };
 
@@ -205,7 +218,7 @@ describe("CreateItemList suggestions", () => {
 
     await user.click(await screen.findByRole("button", { name: "Add oat milk" }));
 
-    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+    expect(screen.getAllByRole("listitem").filter((li) => li.textContent)).toHaveLength(3);
     expect(screen.getByRole("status")).toHaveTextContent("Added to Weekly");
     expect(screen.queryByRole("group", { name: "Suggestion" })).not.toBeInTheDocument();
 
@@ -226,10 +239,13 @@ describe("CreateItemList suggestions", () => {
     await addItems(user, "Bread", "Butter");
 
     await user.click(await screen.findByRole("button", { name: "Add oat milk" }));
-    expect(screen.getByRole("status")).toHaveTextContent("Added to this list");
+    expect(screen.getByRole("status")).toHaveTextContent("Added to Weekly");
     await user.click(await screen.findByRole("button", { name: "Add eggs" }));
 
-    const names = screen.getAllByRole("listitem").map((li) => li.textContent);
+    const names = screen
+      .getAllByRole("listitem")
+      .map((li) => li.textContent)
+      .filter(Boolean);
     expect(names).toEqual(["Bread", "Butter", "oat milk", "eggs"]);
     expect(screen.queryByRole("group", { name: "Suggestion" })).not.toBeInTheDocument();
   });

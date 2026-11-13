@@ -13,8 +13,16 @@ _Avoid_: User, account, customer, household
 ### Lists and items
 
 **Grocery list**:
-A named collection of items a Shopper intends to buy. A Shopper can keep several at once.
+A named collection of items a Shopper intends to buy. A Shopper can keep several at once. Each one is either an Active list or an Archived list.
 _Avoid_: Note, cart
+
+**Active list**:
+A Grocery list the Shopper has not archived. The dashboard shows Active lists, and unchecked items on them are Open items. A Shopper can keep several at once.
+_Avoid_: Current list, live list
+
+**Archived list**:
+A Grocery list the Shopper has set aside after a trip. It stays readable, and its Additions stay in history. Its items are not Open.
+_Avoid_: Deleted list, history, past list
 
 **Item**:
 A thing a Shopper buys, identified by its name ignoring capitalization and extra spaces. `Milk` and `milk` are the same Item; `2% milk` and `lactose-free milk` are different Items.
@@ -25,7 +33,7 @@ A descriptive tag on an Item, such as its family (`milk`) or an attribute (`2%`,
 _Avoid_: Category, synonym, variant id
 
 **Open item**:
-An Item that is unchecked on at least one of the Shopper's Grocery lists. The app does not suggest re-buying an Open item.
+An Item that is unchecked on at least one of the Shopper's Active lists. The app does not suggest re-buying an Open item. An Item that is unchecked only on Archived lists is not Open.
 _Avoid_: Active item, item on an active list
 
 **Checked off**:

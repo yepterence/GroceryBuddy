@@ -45,6 +45,7 @@ describe("requests", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   describe("getUserId", () => {
@@ -53,6 +54,25 @@ describe("requests", () => {
       expect(first).toMatch(/^[0-9a-f-]{36}$/);
       expect(getUserId()).toBe(first);
       expect(localStorage.getItem("grocery-buddy-user-id")).toBe(first);
+    });
+
+    describe("demo startup (startup.sh --demo → VITE_DEMO_USER_ID)", () => {
+      const seeded = "11111111-1111-4111-8111-111111111111";
+
+      beforeEach(() => {
+        vi.stubEnv("VITE_DEMO_USER_ID", seeded);
+      });
+
+      it("uses the seeded Shopper on first load instead of a random id", () => {
+        expect(getUserId()).toBe(seeded);
+        expect(localStorage.getItem("grocery-buddy-user-id")).toBe(seeded);
+      });
+
+      it("replaces a stale browser id after re-running demo startup", () => {
+        localStorage.setItem("grocery-buddy-user-id", "22222222-2222-4222-8222-222222222222");
+        expect(getUserId()).toBe(seeded);
+        expect(localStorage.getItem("grocery-buddy-user-id")).toBe(seeded);
+      });
     });
   });
 

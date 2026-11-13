@@ -34,6 +34,7 @@ consumed*, plus the consumption trends derived from them.
 ## 3. Users & Stories
 
 - As a shopper, I maintain a list of items I need, and check them off.
+- As a shopper, I archive a list when the trip is done, and I can still look back at archived lists.
 - As a shopper, I record items I've consumed/purchased (manually or via cart events).
 - As a shopper, the app surfaces items I consume on a cadence as "likely needed again."
 
@@ -42,7 +43,8 @@ consumed*, plus the consumption trends derived from them.
 | ID | Requirement | Goal |
 |----|-------------|------|
 | F1 | Create/edit/delete a **needed-items list**; check items off | G1 |
-| F2 | Multiple named lists per user (reuses existing `GroceryList` shape) | G1 |
+| F2 | Multiple named lists per user (reuses existing `GroceryList` shape). Each is an **Active list** until the Shopper archives it | G1 |
+| F2a | Archive a list. An **Archived list** stays readable and keeps its items and Additions. Archiving writes no Inclusion. Items on an Archived list are not Open | G1 |
 | F3 | Record a **list-inclusion event** every time an item is added to a list (timestamp) | G2 |
 | F4 | Maintain per-item **inclusion history + count** across lists/sessions | G2 |
 | F5 | (Optional) record a purchase/consumption event when checkout data exists | G2 |
@@ -55,7 +57,7 @@ One Postgres database. DDL: [`db/schema.sql`](../../db/schema.sql), applied by [
 
 ```
 user(id)   -- anonymous tenant key; no email, password, or session
-grocery_list(id, user_id, title)
+grocery_list(id, user_id, title, archived_at)   -- null while the list is active
 needed_item(id, user_id, list_id, name, checked, created_at)
 list_inclusion(id, user_id, item_name, list_id, included_at)
 item_trend(user_id, item_name, inclusion_count, cadence_days, last_included_at, next_due_at)
@@ -69,6 +71,7 @@ Notes:
 - **Acquired** is when an item is checked off. Checking an item off marks that row done. It does not write a `list_inclusion`.
 - `list_inclusion` is an append-only log written when an item is **added** to a list. `included_at` is that timestamp. These rows are the frequency tracker (F3, F4). "Placed in cart" in v1 means this add.
 - Deleting a list deletes its `needed_item` rows. Inclusion rows stay, with `list_id` set null, so counts survive across lists (F4).
+- `archived_at` null means the list is an Active list. Setting it archives the list (F2a). Needed items and inclusions stay. The dashboard shows Active lists; Archived lists are the history of finished trips. A Shopper can keep several Active lists at once.
 - `list_inclusion` is **immutable** truth. `item_trend` is a **derived, recomputable** cache, updated when a new inclusion lands, so a list read does not rescan history. `cadence_days` and `next_due_at` stay null until a second inclusion makes an interval possible. Additions of the same item within 12 hours of the first addition in a session (even across multiple lists) are collapsed into a single inclusion when computing `item_trend`, so `inclusion_count` there counts sessions, not raw adds, and one sitting does not skew `cadence_days` toward zero (see [`../tradeoffs.md`](../tradeoffs.md)).
 - `item_name` is the join key for now, normalized (lowercased, whitespace collapsed) so `Milk` and `milk` are one item while `2% milk` stays separate. A canonical food id can be introduced later (PRD 03/04) as labels on an item, never by merging histories. See [ADR 0001](../adr/0001-item-identity-by-normalized-name.md).
 - No price column and no vendor table. A Flipp price is a per-store, time-bounded observation. M1 ranks coverage from the scraper response at request time. An item with no flyer price does not count toward that store's coverage.
@@ -92,7 +95,7 @@ Price and store never enter these contracts.
 
 ## 8. Success Metrics
 
-- % of users maintaining at least one active list.
+- % of users maintaining at least one Active list.
 - Trend "due" precision: when we say an item is due, was it actually re-acquired?
 
 ## 9. Open Questions

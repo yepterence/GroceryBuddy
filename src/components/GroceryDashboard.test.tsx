@@ -237,7 +237,9 @@ describe("GroceryDashboard", () => {
       expect(
         await screen.findByRole("heading", { level: 3, name: "Saturday trip" }),
       ).toBeInTheDocument();
-      expect(screen.getByRole("listitem")).toHaveTextContent("Bread");
+      expect(
+        screen.getAllByRole("listitem").some((li) => li.textContent === "Bread"),
+      ).toBe(true);
       expect(createList).toHaveBeenCalledWith("Saturday trip", [
         { name: "Bread", source: "manual" },
       ]);
