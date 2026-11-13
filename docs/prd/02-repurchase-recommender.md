@@ -67,8 +67,8 @@ score           = 0.5 * frequency_score + 0.5 * due_score  # weights tunable
 
 **Step 4 — eligibility / filters.**
 - Require `inclusion_count >= 2` (a one-off isn't a re-purchase habit).
-- Skip **Open items**: items unchecked on any of the Shopper's lists (don't recommend what's
-  already on a list). Lists have no active/closed state; see [`../../GLOSSARY.md`](../../GLOSSARY.md).
+- Skip **Open items**: items unchecked on any of the Shopper's Active lists (don't recommend what's
+  already on a list the Shopper is still using). An Archived list does not count. See [`../../GLOSSARY.md`](../../GLOSSARY.md).
 - For items with `inclusion_count >= 2` but no reliable cadence yet, fall back to
   `score = frequency_score` (pure habit strength).
 
@@ -132,7 +132,7 @@ with its `source`, so `POST /lists` takes `items: [{name, source}]`.
 |----|-------------|
 | F1 | Compute per-item `inclusion_count` (+ cadence when available) from `list_inclusion_history` |
 | F2 | Generate scored re-purchase suggestions per the frequency + recency algorithm above |
-| F3 | Exclude Open items (unchecked on any of the Shopper's lists) |
+| F3 | Exclude Open items (unchecked on any of the Shopper's Active lists). Archiving a list takes its items out of Open ([PRD 01](./01-core-item-tracking.md) F2a) |
 | F4 | Surface suggestions **inside the list the Shopper is building** (the create form, and saved lists), once the list's **grocery intent** is high enough (§4a). One tap adds the item to that same list and confirms it with a banner: "Added to {list title}", or "Added to this list" when untitled (decided 2026-11-03/04) |
 | F5 | Record acceptance (added? dismissed?) as an outcome signal for later ranking/training. An accepted suggestion **does** count toward cadence like any addition, tagged `source = suggestion` so it can be down-weighted later ([ADR 0003](../adr/0003-accepted-suggestions-count-toward-cadence.md)) |
 | F6 | (Optional) blend in `purchase_history` when checkout data is available |
@@ -176,8 +176,7 @@ every outcome points at exactly what they saw. Decided 2026-11-02.
   precision is poor.
 - Should accepted suggestions also log a `purchase_event` (when checkout exists) to enrich
   the optional purchase signal?
-- F3 uses Open items, not "active lists" (decided 2026-11-02). An item left unchecked after
-  it was bought stays Open and blocks its own recommendations indefinitely. See §10.
+- F3 uses Open items on Active lists, not an inferred "this list looks current" (decided 2026-11-02). An item left unchecked on an Active list stays Open and blocks its own recommendations until the Shopper checks it off or archives that list. See §10.
 - Is a lasting dismissal on typing too strong for an Item that just does not belong on this
   list? See §11.
 
@@ -191,8 +190,8 @@ Users often grab an item without checking it off. Two effects:
 
 - **Cadence is unaffected.** `item_trend` is computed from additions to a list, not
   check-offs, so the next add of the item still lands correctly.
-- **F3 is affected.** The forgotten item stays unchecked, so it counts as "already on an
-  active list" and its re-purchase suggestion is suppressed until the user cleans up.
+- **F3 is affected.** The forgotten item stays unchecked on an Active list, so it stays Open
+  and its re-purchase suggestion is suppressed until the Shopper checks it off or archives the list.
 
 Check-offs are therefore a useful but unreliable purchase signal. This feature closes the
 gap with low-friction confirmations, then inference.

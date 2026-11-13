@@ -72,7 +72,7 @@ The session window (section 2) can't tell these apart, because all three can hap
 
 ### Options for Later
 - **Duplicate flag, recorded when the item is added.**
-  - *Signal:* the same `item_name` is already unchecked on one of the user's active lists. The current schema can detect this.
+  - *Signal:* the same `item_name` is already unchecked on one of the Shopper's Active lists ([PRD 01](./prd/01-core-item-tracking.md) F2a). An Archived list does not count. The current schema can detect this once `grocery_list.archived_at` exists.
   - *Use:* exclude flagged rows from the habit count. A UI warning ("Milk is already on Weekly") would prevent most duplicates in the first place.
   - *Why at add time:* the evidence is gone once the item is checked off or its list is deleted, and `list_inclusion` is append-only, so it can't be reconstructed later.
 - **Source on each inclusion (`manual`, `recipe`, `recommendation`).**

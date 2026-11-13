@@ -15,6 +15,14 @@ into a framework** (concrete-then-extract).
 Companion technical design: [`../modular-recommendations-design.md`](../modular-recommendations-design.md)
 (the "how" for PRD 04).
 
+## QoL / engineering (off the product stack)
+
+Not sequenced with 01→04. Implement when infra time is available.
+
+| PRD | Purpose | Status |
+|-----|---------|--------|
+| [GitHub Actions CI](./qol-github-actions-ci.md) | Run `test.sh` + npm lint/build/test on every push/PR | Draft |
+
 ## Goal glossary
 
 | ID | Goal |

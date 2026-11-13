@@ -17,6 +17,7 @@ this file tracks what is actually done. Status key: ✅ done · 🟡 partial / u
 | AI capture + nutrition (PRD 03) | ⬜ | |
 | Recommendation framework (PRD 04) | ⬜ | |
 | Auth / production gate | ⬜ | Blocker before production, see below |
+| GitHub Actions CI (QoL PRD) | ⬜ | Designed in [`prd/qol-github-actions-ci.md`](./prd/qol-github-actions-ci.md); not started |
 
 ## Done
 
