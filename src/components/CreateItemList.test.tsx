@@ -31,7 +31,8 @@ const eggs = suggestion("eggs", 0.7);
 const offer = (...suggestions: Suggestion[]) =>
   vi.mocked(fetchRepurchaseSuggestions).mockResolvedValue({
     suggestions,
-    knownItemNames: suggestions.map((s) => s.payload.item_name),
+    // Bread and butter are familiar, so a neutral title can reach the item signal.
+    knownItemNames: ["bread", "butter", ...suggestions.map((s) => s.payload.item_name)],
   });
 
 const savedList = {
@@ -173,9 +174,10 @@ describe("CreateItemList suggestions", () => {
   const newItemInput = () => screen.getByPlaceholderText("New Item");
 
   const addItems = async (user: ReturnType<typeof userEvent.setup>, ...names: string[]) => {
-    // The new-item row stays hidden until the list has a title.
+    // The new-item row stays hidden until the list has a title. "Saturday trip"
+    // matches neither word list, so intent comes from the Items typed.
     if (!screen.queryByPlaceholderText("New Item")) {
-      await user.type(screen.getByPlaceholderText("Title"), "Weekly");
+      await user.type(screen.getByPlaceholderText("Title"), "Saturday trip");
     }
     for (const name of names) await user.type(newItemInput(), `${name}{Enter}`);
   };
@@ -183,7 +185,7 @@ describe("CreateItemList suggestions", () => {
   const outcomes = (action: "accepted" | "dismissed") =>
     vi.mocked(recordOutcome).mock.calls.filter(([, a]) => a === action);
 
-  it("shows nothing until the draft has two Items, then the top Suggestion and why", async () => {
+  it("hides Suggestions until two familiar typed Items, then shows the top one and why", async () => {
     offer(oatMilk, eggs);
     const user = userEvent.setup();
     render(<CreateItemList />);
@@ -200,6 +202,36 @@ describe("CreateItemList suggestions", () => {
     expect(bubble).not.toHaveTextContent("eggs");
   });
 
+  it("shows a Suggestion from a grocery title before any Item is added", async () => {
+    offer(oatMilk);
+    const user = userEvent.setup();
+    render(<CreateItemList />);
+    await user.type(screen.getByPlaceholderText("Title"), "Weekly");
+
+    expect(await screen.findByRole("group", { name: "Suggestion" })).toHaveTextContent(
+      "oat milk",
+    );
+  });
+
+  it("hides Suggestions when the title is an event, even with familiar Items", async () => {
+    offer(oatMilk);
+    const user = userEvent.setup();
+    render(<CreateItemList />);
+    await user.type(screen.getByPlaceholderText("Title"), "Birthday party");
+    await addItems(user, "Bread", "Butter");
+
+    expect(screen.queryByRole("group", { name: "Suggestion" })).not.toBeInTheDocument();
+  });
+
+  it("hides Suggestions when the typed Items were never added before", async () => {
+    offer(oatMilk);
+    const user = userEvent.setup();
+    render(<CreateItemList />);
+    await addItems(user, "asdf", "qwerty");
+
+    expect(screen.queryByRole("group", { name: "Suggestion" })).not.toBeInTheDocument();
+  });
+
   it("skips a Suggestion already on the draft", async () => {
     offer(oatMilk, eggs);
     const user = userEvent.setup();
@@ -213,18 +245,17 @@ describe("CreateItemList suggestions", () => {
     offer(oatMilk);
     const user = userEvent.setup();
     render(<CreateItemList />);
-    await user.type(screen.getByPlaceholderText("Title"), "Weekly");
     await addItems(user, "Bread", "Butter");
 
     await user.click(await screen.findByRole("button", { name: "Add oat milk" }));
 
     expect(screen.getAllByRole("listitem").filter((li) => li.textContent)).toHaveLength(3);
-    expect(screen.getByRole("status")).toHaveTextContent("Added to Weekly");
+    expect(screen.getByRole("status")).toHaveTextContent("Added to Saturday trip");
     expect(screen.queryByRole("group", { name: "Suggestion" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Add" }));
     await waitFor(() => expect(outcomes("accepted")).toHaveLength(1));
-    expect(createList).toHaveBeenCalledWith("Weekly", [
+    expect(createList).toHaveBeenCalledWith("Saturday trip", [
       { name: "Bread", source: "manual" },
       { name: "Butter", source: "manual" },
       { name: "oat milk", source: "suggestion" },
@@ -239,7 +270,7 @@ describe("CreateItemList suggestions", () => {
     await addItems(user, "Bread", "Butter");
 
     await user.click(await screen.findByRole("button", { name: "Add oat milk" }));
-    expect(screen.getByRole("status")).toHaveTextContent("Added to Weekly");
+    expect(screen.getByRole("status")).toHaveTextContent("Added to Saturday trip");
     await user.click(await screen.findByRole("button", { name: "Add eggs" }));
 
     const names = screen
