@@ -97,13 +97,22 @@ kept in one place so they can be tuned):
 
 - **Title signal:** a grocery word in the title (`grocery`, `groceries`, `weekly`, `shop`,
   `market`, `food`, `costco`) shows suggestions. An event word (`party`, `bbq`, `birthday`,
-  `potluck`, `christmas`) always hides them.
-- **Item signal:** with at least 2 Items on the list, show suggestions when at least half of
-  them are Items the Shopper has added before.
+  `potluck`, `christmas`) always hides them, even when the title also has a grocery word.
+  Words match as whole words, ignoring capitalization, so `workshop` is not `shop`. The word
+  lists are English. A title in another language, or a title with no spaces between words,
+  matches neither list, and the decision falls to the item signal.
+- **Item signal:** only Items the Shopper typed (`source = manual`) count, so accepting a
+  Suggestion cannot raise intent. With at least 2 of those, show Suggestions when at least
+  half are Items the Shopper has added before. On a saved list, "added before" means an
+  Addition on some other list, so a list does not count its own Items as familiar. On the
+  create form the list is not saved yet, so every prior Addition counts. Familiarity is an
+  exact match against this Shopper's own history: gibberish and words they have never used
+  are unfamiliar, and an Item in any language counts once they have added it before.
 
 **Computed where.** The list opens with one `GET /recommendations/repurchase?user_id=`, which
 returns the due suggestions (dismissals already applied) and the Shopper's known Item names.
-The browser scores intent locally as Items are added. The score is not stored on saved lists;
+For a saved list the request also sends `list_id`, and the known names leave out Additions on
+that list. The browser scores intent locally as Items are added. The score is not stored;
 it is recomputed when a list is shown.
 
 **How many.** At most 5, highest score first, and only Items that are due: `days_since >= 0.8 ×
@@ -112,7 +121,7 @@ cadence_days`. Tune the 0.8 and the 5 from acceptance data.
 **Presentation (decided 2026-11-10).** One Suggestion at a time, in the empty Item slot, with
 its reason. Accepting adds that one Item, and the next due Suggestion takes the empty slot,
 so accepting N times adds N Items. The bubble never lists several Items, and one tap never
-adds several (see §11). Starting to type in the slot dismisses the shown Suggestion; the typed
+adds several (see §12). Starting to type in the slot dismisses the shown Suggestion; the typed
 text stays, and the next Suggestion appears once the slot is empty again. After 10 seconds
 with no action the bubble collapses to a chip, which is not a dismissal: clicking the chip
 brings the same Suggestion back and restarts the 10 seconds. Saving or leaving the list does
@@ -124,7 +133,10 @@ not suggested again until the Shopper adds it to a list themselves (its next Inc
 Dismissal is a clear "no"; the way back is the Shopper's own add, or later a price offer (F7).
 
 **Accepting.** In the create form a tap adds the Item to the draft; on save each Item is sent
-with its `source`, so `POST /lists` takes `items: [{name, source}]`.
+with its `source`, so `POST /lists` takes `items: [{name, source}]`, and the accepted Outcome
+is recorded then. On a saved list a tap adds the Item right away (`POST /lists/<id>/items`
+with `source = suggestion`), records the accepted Outcome right away, and a banner says
+"Added to {list title}".
 
 ## 5. Functional Requirements
 
@@ -178,7 +190,16 @@ every outcome points at exactly what they saw. Decided 2026-11-02.
   the optional purchase signal?
 - F3 uses Open items on Active lists, not an inferred "this list looks current" (decided 2026-11-02). An item left unchecked on an Active list stays Open and blocks its own recommendations until the Shopper checks it off or archives that list. See §10.
 - Is a lasting dismissal on typing too strong for an Item that just does not belong on this
-  list? See §11.
+  list? See §12.
+- Reusing a list by unchecking its Items writes no Addition (`set_item_checked`), so Cadence
+  never sees the repeat, and the unchecked Items stay Open and block their own Suggestions.
+  A "shop again" that copies the list into a new one is the likely fix. Not in v1.
+- Shared lists: whose familiarity and whose Cadence drive the Suggestions? Sharing is not
+  built ([ADR 0002](../adr/0002-anonymous-device-bound-shopper.md)).
+- Item category as a later intent signal, for a party list made of familiar snacks, once
+  PRD 03 can label Items.
+- Titles in languages other than English, including scripts with no spaces between words.
+  Out of scope for v1. See the English-only caveat in the [PRD index](./README.md).
 
 ## 10. Deferred: Handling Missed Check-offs
 
@@ -230,7 +251,20 @@ possible later `receipt` source.
 - Thresholds for "most of a list checked" (phase 1) and for staleness (phase 3).
 - Whether a resolved-as-purchased item is auto-checked, hidden, or removed from its list.
 
-## 11. Deferred: Several Suggestions in One Bubble
+## 11. Later: A Stored Classification of a Saved List
+
+> Status: later feature, not in v1 (noted 2026-11-13).
+
+Grocery intent is judged live, while a list is being built, and it is never stored. It only
+decides whether Suggestions show. A separate, later feature assigns a classification to a
+list after it is saved and stores it. That stored classification is what usage patterns and
+per-purpose Cadence need (a Costco run every 30 days alongside the weekly shop every 7; see
+[`../tradeoffs.md`](../tradeoffs.md) §3). The Shopper does not pick it.
+
+It needs its own glossary term. "Label" already means a tag on an Item, and "purpose",
+"list type", and "category" are terms to avoid.
+
+## 12. Deferred: Several Suggestions in One Bubble
 
 > Status: rejected for v1 (decided 2026-11-10). v1 shows one Suggestion at a time (§4a).
 

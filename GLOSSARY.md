@@ -61,7 +61,7 @@ An Item the app proposes while the Shopper is building a Grocery list, with a re
 _Avoid_: Recommendation (in UI copy), tip
 
 **Grocery intent**:
-How strongly a Grocery list being built looks like a regular grocery run, judged from its title and the Items added so far. Suggestions appear only when it is high enough.
+How strongly a Grocery list being built looks like a regular grocery run, judged from its title and the Items the Shopper typed. Suggestions appear only when it is high enough. It is judged again each time the list is shown, and it is not stored.
 _Avoid_: Purpose, list type, category
 
 **Outcome**:

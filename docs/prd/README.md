@@ -89,6 +89,23 @@ out of v1: plain-text name matching is too ambiguous, and good matching needs It
 long-term differentiator (MyFitnessPal/Cronometer stop at the gap; Flipp/Reebee don't know
 nutrition) and is built only if time allows after the v1 loop ships.
 
+**English only (v1).** Titles, Item names, and the grocery-intent word lists are English.
+Real Hindi (Devanagari) and Simplified Chinese input is not supported:
+
+- The title word lists are English. Whole-word matching also cannot find a word in a title
+  that has no spaces between words, such as Chinese. Those titles fall through to the item
+  signal.
+- Item identity ([ADR 0001](../adr/0001-item-identity-by-normalized-name.md)) lowercases a
+  name and collapses its spaces. It does not normalize Unicode, so a Hindi name that looks
+  the same can be stored as two Items, and simplified and traditional forms (面 / 麵) are
+  different Items.
+- Whether an Item is familiar still works in any script: it is an exact match against what
+  this Shopper has added before.
+
+The first step when other languages are in scope is Unicode normalization in both name
+normalizers (`src/items.ts`, `api/items.py`). That changes Item identity for rows already
+stored, so it needs a data migration and an amendment to ADR 0001.
+
 | PRD / module | v1 status | Notes |
 |--------------|-----------|-------|
 | 01 Core item tracking | **Build** | Small foundation; needed-items + **list-inclusion history** |
