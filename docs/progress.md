@@ -1,6 +1,6 @@
 # Project Progress
 
-Last updated: 2026-11-06. Scope and sequencing live in [`prd/README.md`](./prd/README.md);
+Last updated: 2026-11-13. Scope and sequencing live in [`prd/README.md`](./prd/README.md);
 this file tracks what is actually done. Status key: ✅ done · 🟡 partial / unverified · ⬜ not started.
 
 ## Summary
@@ -13,7 +13,7 @@ this file tracks what is actually done. Status key: ✅ done · 🟡 partial / u
 | Database in Docker | ✅ | `docker-compose.yml` (app + test services) |
 | Automated tests | ✅ | Run against a real Postgres (`./scripts/test.sh`); last full run 2026-11-10 (131 passed, 1 skipped; frontend 64 passed) |
 | Frontend ↔ API integration | 🟡 | `src/requests.ts` wired into the create form and dashboard; unit-tested with mocked `fetch`, **not yet tried in a browser against the live API** |
-| Re-purchase recommender (PRD 02) | 🟡 | `GET /recommendations/repurchase`, outcome recording and the one-at-a-time Suggestion bubble on the create form are built (2026-11-10); grocery intent and suggestions on saved lists not yet; not tried in a browser |
+| Re-purchase recommender (PRD 02) | 🟡 | `GET /recommendations/repurchase`, outcome recording, the Suggestion bubble, grocery intent (§4a) and suggestions on saved lists are built (2026-11-13); not tried in a browser |
 | AI capture + nutrition (PRD 03) | ⬜ | |
 | Recommendation framework (PRD 04) | ⬜ | |
 | Auth / production gate | ⬜ | Blocker before production, see below |
@@ -29,7 +29,7 @@ this file tracks what is actually done. Status key: ✅ done · 🟡 partial / u
 - [x] ADR 0001 item identity by normalized name, ADR 0002 anonymous device-bound Shopper, ADR 0003 accepted suggestions count toward cadence
 - [x] `GLOSSARY.md`: domain terms (Shopper, Item, Addition, Inclusion, Cadence, Open item, Suggestion, grocery intent)
 - [x] PRD 02 amended: Open items (F3), suggestions inside the list being built (F4, §4a grocery intent), computed-on-read suggestions, deferred missed check-off handling (§10)
-- [x] PRD 02 amended (2026-11-10): one-at-a-time presentation and typing-over-dismisses (§4a); multi-item bubble rejected (§11)
+- [x] PRD 02 amended (2026-11-10): one-at-a-time presentation and typing-over-dismisses (§4a); multi-item bubble rejected (§12)
 
 ### Database (`db/`, `scripts/`)
 - [x] Schema: `user`, `grocery_list`, `needed_item`, `list_inclusion` (append-only), `item_trend` (derived cache), plus 4 indexes
@@ -64,13 +64,13 @@ this file tracks what is actually done. Status key: ✅ done · 🟡 partial / u
 ## Next up
 
 - [x] Load `.env` in the API (`python-dotenv` in `api/db.py`)
-- [x] Connect the React frontend (`src/`) to the list API (`requests.ts`; create, load, check, delete). Still to do: try it end to end in a browser, and add UI for adding an item to an existing list (`addItem` exists but no component uses it)
+- [x] Connect the React frontend (`src/`) to the list API (`requests.ts`; create, load, check, delete, add an item to a saved list). Still to do: try it end to end in a browser
 - [x] Update `item_trend` from `list_inclusion` (`api/trends.py` + `db.update_item_trend`: median `cadence_days`, `next_due_at`, 12-hour session deduplication, `inclusion_count >= 2` eligibility, and frequency + recency `calculate_score`; trade-offs documented in `docs/tradeoffs.md`)
 - [x] Implement ADR 0001: normalize item names (lowercase, collapse whitespace) when an addition is recorded; `needed_item.name` keeps what was typed (`api/items.py`, used by `create_list` and `add_item`, 2026-11-05; DB tests passed 2026-11-06). Local data written before this must be reset with `docker compose down -v`
 - [x] Implement ADR 0003: `source` column on `list_inclusion` (`manual` | `suggestion`, NOT NULL, default `manual`). `POST /lists` takes items as names or `{name, source}`; `POST /lists/<id>/items` takes an optional `source`. Accepted suggestions still count toward `item_trend` (2026-11-06). Existing databases need `ALTER TABLE list_inclusion ADD COLUMN source TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'suggestion'))` or a reset
 - [x] PRD 02: `GET /recommendations/repurchase` computed on read from `item_trend` (`api/suggestions.py`): due at 0.8 × cadence, Open items (F3) and standing dismissals excluded, top 5 (2026-11-10)
 - [x] PRD 02: Suggestion bubble in the create form (F4, §4a presentation) with outcome recording (F5) via `POST /recommendations/outcomes` and the `recommendation` / `recommendation_outcome` tables (2026-11-10). Existing databases need the two new tables (`scripts/create-tables.sh` adds them). Tickets in `.scratch/repurchase-suggestions/issues/`
-- [ ] PRD 02: grocery-intent score (§4a) replacing the 2-Item gate, and suggestions on saved lists (F4)
+- [x] PRD 02: grocery-intent score (§4a) replacing the 2-Item gate, and suggestions on saved lists (F4) (2026-11-13). `needed_item.source` records manual vs suggestion. Re-running `scripts/create-tables.sh` adds that column to an existing database
 - [x] ~~Decide source and list-purpose signals~~ Source decided in ADR 0003; list purpose replaced by inferred grocery intent (PRD 02 §4a, 2026-11-04)
 - [ ] Decide on duplicate handling for repeated additions (`docs/tradeoffs.md` section 3); per-purpose cadence still open
 - [ ] PRD 03: AI capture and nutrition (thin)
@@ -97,7 +97,8 @@ Product feel and layout in `src/styles/theme.css` and list components (`GroceryD
 - **No authentication.** `user_id` comes from the request, so anyone who knows another user's UUID can read and write their lists. Must be solved before production (PRD 01 §10) and before the mobile version ([ADR 0002](./adr/0002-anonymous-device-bound-shopper.md)). List sharing is also not implemented.
 - **Concurrent adds can leave `item_trend` stale.** Two overlapping adds of the same item each recompute without seeing the other's uncommitted row; the cache corrects itself on the next addition. A row lock on `(user_id, item_name)` would close it.
 - **Virtualenv name mismatch.** README says `venv/`, but `scripts/test.sh` and `.gitignore` expect `gb-api/`, so following the README creates an un-ignored folder.
-- **No migrations.** `schema.sql` only creates missing objects; it never alters existing tables. Needs a migration tool before the schema changes in a live database.
+- **No migrations.** `schema.sql` only creates missing objects; it never alters existing tables, except `needed_item.source`, which it adds with `ADD COLUMN IF NOT EXISTS`. Needs a migration tool before further schema changes in a live database.
 - **Lost `.env.example` contents.** A pre-existing `.env.example` was overwritten without being read during compose setup; its original contents are lost.
 - **Dependency pins.** `tracerite` needs `setuptools<81` on Python 3.12+ (handled in `requirements-dev.txt`, not in `requirements.txt`).
 - **Production Postgres.** The compose file is for local use; production needs managed or hardened Postgres, backups, TLS, a least-privilege role.
+- **English only (v1).** The grocery-intent title word lists are English, and a Chinese title has no spaces between words, so whole-word matching cannot read it. Item identity ([ADR 0001](./adr/0001-item-identity-by-normalized-name.md)) does no Unicode normalization: a Hindi name that looks the same can be stored as two Items, and simplified and traditional forms (面 / 麵) are different Items. Familiarity still works in any script, because it is an exact match against this Shopper's own history. Supporting other languages starts with Unicode normalization in `src/items.ts` and `api/items.py`, which changes Item identity for stored rows and needs a data migration plus an ADR 0001 amendment. See [`prd/README.md`](./prd/README.md).
