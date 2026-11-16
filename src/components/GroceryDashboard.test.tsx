@@ -5,7 +5,16 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import GroceryDashboard from "./GroceryDashboard";
 import CreateItemList from "./CreateItemList";
 import { useListStore } from "../store/applicationStore";
-import { createList, fetchLists, removeList, setItemChecked } from "../requests";
+import {
+  addItem,
+  createList,
+  fetchLists,
+  fetchRepurchaseSuggestions,
+  recordOutcome,
+  removeList,
+  setItemChecked,
+} from "../requests";
+import { Suggestion } from "../types";
 import { GroceryList } from "../types";
 
 vi.mock("../requests", () => ({
@@ -13,6 +22,7 @@ vi.mock("../requests", () => ({
   fetchLists: vi.fn(),
   removeList: vi.fn(),
   setItemChecked: vi.fn(),
+  addItem: vi.fn(),
   fetchRepurchaseSuggestions: vi.fn(async () => ({ suggestions: [], knownItemNames: [] })),
   recordOutcome: vi.fn(),
 }));
@@ -173,6 +183,135 @@ describe("GroceryDashboard", () => {
 
       expect(await screen.findByRole("alert")).toHaveTextContent("list not found");
       expect(screen.getByText("Weekly")).toBeInTheDocument();
+    });
+  });
+
+  describe("adding an item to a saved list", () => {
+    const suggestion = (name: string): Suggestion => ({
+      type: "repurchase",
+      payload: {
+        item_name: name,
+        inclusion_count: 4,
+        last_included_at: "2026-11-01T12:00:00+00:00",
+        cadence_days: 7,
+        next_due_at: "2026-11-08T12:00:00+00:00",
+      },
+      reason: `You've added ${name} to a list 4x; last time 9d ago.`,
+      score: 0.9,
+    });
+    const oatMilk = suggestion("oat milk");
+
+    const saturday: GroceryList = {
+      id: "list-3",
+      title: "Saturday trip",
+      contents: [
+        { id: "b1", name: "Bread", checked: false, source: "manual" },
+        { id: "b2", name: "Butter", checked: false, source: "manual" },
+      ],
+    };
+
+    beforeEach(() => {
+      vi.mocked(addItem).mockReset();
+      vi.mocked(recordOutcome).mockReset().mockResolvedValue(undefined);
+      vi.mocked(fetchRepurchaseSuggestions)
+        .mockReset()
+        .mockResolvedValue({ suggestions: [], knownItemNames: [] });
+    });
+
+    const openSlot = async (title: string) => {
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: `Add item to ${title}` }));
+      return user;
+    };
+
+    it("saves a typed Item on that list", async () => {
+      vi.mocked(addItem).mockResolvedValue({
+        id: "item-9",
+        name: "Cheese",
+        checked: false,
+        source: "manual",
+      });
+      render(<Harness />);
+      await screen.findByText("Weekly");
+
+      const user = await openSlot("Weekly");
+      const input = screen.getByRole("textbox", { name: "New item on Weekly" });
+      await user.type(input, "Cheese");
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      await waitFor(() => expect(screen.getByText("Cheese")).toBeInTheDocument());
+      expect(addItem).toHaveBeenCalledWith("list-1", "Cheese", "manual");
+    });
+
+    it("offers a Suggestion on a grocery list and adds it with one tap", async () => {
+      vi.mocked(fetchRepurchaseSuggestions).mockResolvedValue({
+        suggestions: [oatMilk],
+        knownItemNames: [],
+      });
+      vi.mocked(addItem).mockResolvedValue({
+        id: "item-9",
+        name: "oat milk",
+        checked: false,
+        source: "suggestion",
+      });
+      render(<Harness />);
+      await screen.findByText("Weekly");
+
+      const user = await openSlot("Weekly");
+
+      await waitFor(() =>
+        expect(fetchRepurchaseSuggestions).toHaveBeenCalledWith("list-1"),
+      );
+      await user.click(await screen.findByRole("button", { name: "Add oat milk" }));
+
+      expect(addItem).toHaveBeenCalledWith("list-1", "oat milk", "suggestion");
+      expect(recordOutcome).toHaveBeenCalledWith(oatMilk, "accepted");
+      expect(await screen.findByRole("status")).toHaveTextContent("Added to Weekly");
+      expect(screen.getByText("oat milk")).toBeInTheDocument();
+    });
+
+    it("hides Suggestions on an event list", async () => {
+      vi.mocked(fetchLists).mockResolvedValue([
+        { id: "list-2", title: "Birthday party", contents: [] },
+      ]);
+      vi.mocked(fetchRepurchaseSuggestions).mockResolvedValue({
+        suggestions: [oatMilk],
+        knownItemNames: ["milk", "eggs"],
+      });
+      render(<Harness />);
+      await screen.findByText("Birthday party");
+
+      await openSlot("Birthday party");
+      await waitFor(() => expect(fetchRepurchaseSuggestions).toHaveBeenCalled());
+
+      expect(screen.queryByRole("group", { name: "Suggestion" })).not.toBeInTheDocument();
+    });
+
+    it("uses familiar Items from other lists, and ignores this list's own", async () => {
+      vi.mocked(fetchLists).mockResolvedValue([saturday]);
+      vi.mocked(fetchRepurchaseSuggestions).mockResolvedValue({
+        suggestions: [oatMilk],
+        knownItemNames: [],
+      });
+      const first = render(<Harness />);
+      await screen.findByText("Saturday trip");
+      await openSlot("Saturday trip");
+      await waitFor(() => expect(fetchRepurchaseSuggestions).toHaveBeenCalledWith("list-3"));
+      expect(screen.queryByRole("group", { name: "Suggestion" })).not.toBeInTheDocument();
+      first.unmount();
+
+      client = makeClient();
+      vi.mocked(fetchRepurchaseSuggestions).mockResolvedValue({
+        suggestions: [oatMilk],
+        knownItemNames: ["bread", "butter"],
+      });
+      render(<Harness />);
+      await screen.findByText("Saturday trip");
+      await openSlot("Saturday trip");
+
+      expect(await screen.findByRole("group", { name: "Suggestion" })).toHaveTextContent(
+        "oat milk",
+      );
     });
   });
 

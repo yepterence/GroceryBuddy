@@ -1,13 +1,145 @@
-import { Fragment, useEffect, useState } from "react";
+import { ChangeEvent, Fragment, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { GroceryLists, GroceryList, Item } from "../types";
+import { GroceryLists, GroceryList, Item, Suggestion } from "../types";
 import { useListStore } from "../store/applicationStore";
-import { fetchLists, removeList, setItemChecked } from "../requests";
+import {
+  addItem,
+  fetchLists,
+  fetchRepurchaseSuggestions,
+  recordOutcome,
+  removeList,
+  setItemChecked,
+} from "../requests";
 import { LISTS_QUERY_KEY } from "../queryClient";
+import { useSuggestionSlot } from "../useSuggestionSlot";
 import Banner from "./Banner";
+import SuggestionBubble from "./Suggestion";
 
 const messageFrom = (err: unknown, fallback: string) =>
   err instanceof Error ? err.message : fallback;
+
+// Outcomes are best effort: a lost one only means the Item may be suggested again.
+const sendOutcome = (suggestion: Suggestion, action: "accepted" | "dismissed") => {
+  recordOutcome(suggestion, action).catch(() => {});
+};
+
+/** The New Item slot on one saved list, with its Suggestion when intent is high enough. */
+const SavedListAdder = ({
+  list,
+  onError,
+  onAdded,
+}: {
+  list: GroceryList;
+  onError: (message: string | null) => void;
+  onAdded: (message: string) => void;
+}) => {
+  const addItemToList = useListStore((state) => state.addItemToList);
+  const [newItem, setNewItem] = useState("");
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [knownItemNames, setKnownItemNames] = useState<string[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchRepurchaseSuggestions(list.id)
+      .then((found) => {
+        if (cancelled) return;
+        setSuggestions(found.suggestions);
+        setKnownItemNames(found.knownItemNames);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSuggestions([]);
+        setKnownItemNames([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [list.id]);
+
+  const { shown, collapsed, dismiss, noteDraftChange, expand } = useSuggestionSlot({
+    title: list.title,
+    items: list.contents,
+    suggestions,
+    knownItemNames,
+    draftText: newItem,
+  });
+
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const typedOver = noteDraftChange(value);
+    if (typedOver) sendOutcome(typedOver, "dismissed");
+    setNewItem(value);
+  };
+
+  const accept = async (suggestion: Suggestion) => {
+    onError(null);
+    try {
+      const saved = await addItem(list.id, suggestion.payload.item_name, "suggestion");
+      addItemToList(list.id, saved);
+      sendOutcome(suggestion, "accepted");
+      onAdded(list.title.trim() ? `Added to ${list.title.trim()}` : "Added to this list");
+      inputRef.current?.focus();
+    } catch (err) {
+      onError(messageFrom(err, "Could not add the item."));
+    }
+  };
+
+  const commitTyped = async () => {
+    const name = newItem.trim();
+    if (!name) return;
+    onError(null);
+    try {
+      const saved = await addItem(list.id, name, "manual");
+      addItemToList(list.id, saved);
+      setNewItem("");
+    } catch (err) {
+      onError(messageFrom(err, "Could not add the item."));
+    }
+  };
+
+  return (
+    <>
+      {shown && (
+        <SuggestionBubble
+          suggestion={shown}
+          collapsed={collapsed}
+          onAccept={() => accept(shown)}
+          onDismiss={() => {
+            dismiss(shown);
+            sendOutcome(shown, "dismissed");
+          }}
+          onExpand={expand}
+        />
+      )}
+      <li className="list-item">
+        <input
+          type="checkbox"
+          checked={false}
+          disabled
+          className="input-list-checkbox"
+          aria-hidden="true"
+          tabIndex={-1}
+        />
+        <input
+          type="text"
+          className="new-item-input"
+          placeholder="New Item"
+          aria-label={`New item on ${list.title}`}
+          value={newItem}
+          onChange={handleChange}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitTyped();
+            }
+          }}
+          ref={inputRef}
+        />
+      </li>
+    </>
+  );
+};
 
 const GroceryDashboard = ({ lists }: GroceryLists) => {
   const setGroceryLists = useListStore((state) => state.setGroceryLists);
@@ -15,6 +147,9 @@ const GroceryDashboard = ({ lists }: GroceryLists) => {
   const deleteList = useListStore((state) => state.deleteList);
   // Errors from check/delete actions.
   const [actionError, setActionError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  // One list at a time offers its New Item slot.
+  const [addingListId, setAddingListId] = useState<string | null>(null);
   // The load error the user already dismissed (compared by identity, so a new
   // failure shows again).
   const [dismissedLoadError, setDismissedLoadError] = useState<unknown>(null);
@@ -68,14 +203,27 @@ const GroceryDashboard = ({ lists }: GroceryLists) => {
       <h2>Grocery List Dashboard</h2>
       <Banner
         type="error"
-        message={actionError ?? loadErrorMessage}
+        message={actionError || loadErrorMessage}
         onDismiss={dismissError}
       />
+      <Banner type="success" message={notice} onDismiss={() => setNotice(null)} />
       <div className="lists">
         {lists &&
           lists.map((newList: GroceryList) => (
             <Fragment key={newList.id}>
               <h3>{newList.title}</h3>
+              <button
+                type="button"
+                aria-label={`Add item to ${newList.title}`}
+                aria-expanded={addingListId === newList.id}
+                onClick={() =>
+                  setAddingListId((current) =>
+                    current === newList.id ? null : newList.id,
+                  )
+                }
+              >
+                Add item
+              </button>
               <button
                 type="button"
                 aria-label={`Delete ${newList.title}`}
@@ -98,6 +246,13 @@ const GroceryDashboard = ({ lists }: GroceryLists) => {
                       {item.name}
                     </li>
                   ))}
+                  {addingListId === newList.id && (
+                    <SavedListAdder
+                      list={newList}
+                      onError={setActionError}
+                      onAdded={setNotice}
+                    />
+                  )}
                 </ul>
               </div>
             </Fragment>

@@ -174,7 +174,11 @@ describe("requests", () => {
 
       expect(call().url).toBe("/api/lists/list-1/items");
       expect(call().method).toBe("POST");
-      expect(call().body).toEqual({ user_id: getUserId(), name: "Cheese" });
+      expect(call().body).toEqual({
+        user_id: getUserId(),
+        name: "Cheese",
+        source: "manual",
+      });
       expect(item).toEqual({ id: "item-9", name: "Cheese", checked: false });
     });
   });
@@ -202,6 +206,18 @@ describe("requests", () => {
         suggestions: [suggestion],
         knownItemNames: ["oat milk", "rice"],
       });
+    });
+
+    it("sends a saved list id so that list's own Additions are left out", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse({ suggestions: [], known_item_names: [] }),
+      );
+
+      await fetchRepurchaseSuggestions("list-1");
+
+      expect(call().url).toBe(
+        `/api/recommendations/repurchase?user_id=${getUserId()}&list_id=list-1`,
+      );
     });
   });
 
