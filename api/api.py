@@ -194,7 +194,14 @@ async def repurchase_suggestions(request):
     user_id = _parse_uuid(request.args.get("user_id"))
     if user_id is None:
         return _error("valid user_id (uuid) is required")
-    found = await db.get_repurchase_suggestions(user_id)
+    # Optional: a saved list, so its own Additions are left out of the known names.
+    list_id = None
+    raw_list_id = request.args.get("list_id")
+    if raw_list_id:
+        list_id = _parse_uuid(raw_list_id)
+        if list_id is None:
+            return _error("valid list_id (uuid) is required")
+    found = await db.get_repurchase_suggestions(user_id, list_id=list_id)
     return json({"status": "success", **found})
 
 

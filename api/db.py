@@ -67,6 +67,7 @@ def _item_row(r):
         "id": str(r["id"]),
         "name": r["name"],
         "checked": r["checked"],
+        "source": r["source"],
         "created_at": r["created_at"].isoformat(),
     }
 
@@ -141,9 +142,10 @@ async def create_list(user_id, title, items):
             )
             for name, source in items:
                 row = await conn.fetchrow(
-                    "INSERT INTO needed_item (id, user_id, list_id, name) "
-                    "VALUES ($1, $2, $3, $4) RETURNING id, name, checked, created_at",
-                    uuid.uuid4(), user_id, list_id, name,
+                    "INSERT INTO needed_item (id, user_id, list_id, name, source) "
+                    "VALUES ($1, $2, $3, $4, $5) "
+                    "RETURNING id, name, checked, source, created_at",
+                    uuid.uuid4(), user_id, list_id, name, source,
                 )
                 key = normalize_item_name(name)
                 await conn.execute(
@@ -163,7 +165,7 @@ async def get_lists(user_id):
             "SELECT id, title FROM grocery_list WHERE user_id = $1 ORDER BY title", user_id
         )
         items = await conn.fetch(
-            "SELECT id, list_id, name, checked, created_at FROM needed_item "
+            "SELECT id, list_id, name, checked, source, created_at FROM needed_item "
             "WHERE user_id = $1 ORDER BY created_at",
             user_id,
         )
@@ -186,7 +188,7 @@ async def get_list(user_id, list_id):
         if l is None:
             return None
         items = await conn.fetch(
-            "SELECT id, name, checked, created_at FROM needed_item "
+            "SELECT id, name, checked, source, created_at FROM needed_item "
             "WHERE list_id = $1 AND user_id = $2 ORDER BY created_at",
             list_id, user_id,
         )
@@ -203,9 +205,9 @@ async def add_item(user_id, list_id, name, source="manual"):
             if not owned:
                 return None
             row = await conn.fetchrow(
-                "INSERT INTO needed_item (id, user_id, list_id, name) "
-                "VALUES ($1, $2, $3, $4) RETURNING id, name, checked, created_at",
-                uuid.uuid4(), user_id, list_id, name,
+                "INSERT INTO needed_item (id, user_id, list_id, name, source) "
+                "VALUES ($1, $2, $3, $4, $5) RETURNING id, name, checked, source, created_at",
+                uuid.uuid4(), user_id, list_id, name, source,
             )
             key = normalize_item_name(name)
             await conn.execute(
@@ -222,16 +224,18 @@ async def set_item_checked(user_id, item_id, checked):
     async with _get_pool().acquire() as conn:
         row = await conn.fetchrow(
             "UPDATE needed_item SET checked = $3 WHERE id = $1 AND user_id = $2 "
-            "RETURNING id, name, checked, created_at",
+            "RETURNING id, name, checked, source, created_at",
             item_id, user_id, checked,
         )
     return _item_row(row) if row else None
 
 
-async def get_repurchase_suggestions(user_id, now=None):
+async def get_repurchase_suggestions(user_id, list_id=None, now=None):
     """Due Suggestions (PRD 02 §4a) and the Shopper's known Item names.
 
     Open items (F3) and Items dismissed since their last Inclusion are excluded.
+    With `list_id`, known names leave out Additions on that list, so a saved list
+    does not count its own Items as familiar.
     """
     async with _get_pool().acquire() as conn:
         trend_rows = await conn.fetch(
@@ -250,6 +254,15 @@ async def get_repurchase_suggestions(user_id, now=None):
             "GROUP BY 1",
             user_id,
         )
+        if list_id is None:
+            known_rows = None
+        else:
+            known_rows = await conn.fetch(
+                "SELECT DISTINCT item_name FROM list_inclusion "
+                "WHERE user_id = $1 AND list_id IS DISTINCT FROM $2",
+                user_id,
+                list_id,
+            )
     trends = [
         Trend(
             item_name=r["item_name"],
@@ -265,7 +278,11 @@ async def get_repurchase_suggestions(user_id, now=None):
     dismissed_at = {r["item_name"]: r["at"] for r in dismissed_rows}
     return {
         "suggestions": due_suggestions(trends, open_items, dismissed_at, now=now),
-        "known_item_names": sorted(t.item_name for t in trends),
+        "known_item_names": (
+            sorted(t.item_name for t in trends)
+            if known_rows is None
+            else sorted(r["item_name"] for r in known_rows)
+        ),
     }
 
 

@@ -200,8 +200,21 @@ async def test_update_item_trend_computes_median_cadence_and_next_due_across_day
 async def test_create_list_and_add_item_record_each_additions_source(pool, uid):
     created = await db.create_list(uid, "Weekly", [("milk", "manual"), ("eggs", "suggestion")])
     list_id = uuid.UUID(created["id"])
-    await db.add_item(uid, list_id, "bread")
-    await db.add_item(uid, list_id, "butter", "suggestion")
+    assert [(i["name"], i["source"]) for i in created["items"]] == [
+        ("milk", "manual"),
+        ("eggs", "suggestion"),
+    ]
+    bread = await db.add_item(uid, list_id, "bread")
+    butter = await db.add_item(uid, list_id, "butter", "suggestion")
+    assert bread["source"] == "manual"
+    assert butter["source"] == "suggestion"
+    stored = await db.get_list(uid, list_id)
+    assert [i["source"] for i in stored["items"]] == [
+        "manual",
+        "suggestion",
+        "manual",
+        "suggestion",
+    ]
 
     sources = {r["item_name"]: r["source"] for r in await inclusions(pool, uid)}
     assert sources == {
