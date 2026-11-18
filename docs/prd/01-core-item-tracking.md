@@ -35,6 +35,8 @@ consumed*, plus the consumption trends derived from them.
 
 - As a shopper, I maintain a list of items I need, and check them off.
 - As a shopper, I archive a list when the trip is done, and I can still look back at archived lists.
+- As a shopper, I clear a list to start it afresh, and the list keeps its name.
+- As a shopper, I search my lists by title or by an Item on them.
 - As a shopper, I record items I've consumed/purchased (manually or via cart events).
 - As a shopper, the app surfaces items I consume on a cadence as "likely needed again."
 
@@ -50,6 +52,8 @@ consumed*, plus the consumption trends derived from them.
 | F5 | (Optional) record a purchase/consumption event when checkout data exists | G2 |
 | F6 | Compute **trend signal** per item: inclusion frequency + recency + "due" estimate | G2 |
 | F7 | Expose tracking data as **signals** (`needed_items`, `list_inclusion_history`, optional `purchase_history`) for later PRDs | G1, G2 |
+| F8 | Clear a list: remove every Item on it and keep the list and its title. Writes no Addition. Cleared Items are not Open | G1 |
+| F9 | Search the lists on the dashboard by title or Item name. An empty search shows every list | G1 |
 
 ## 5. Data Model
 
@@ -71,6 +75,7 @@ Notes:
 - **Acquired** is when an item is checked off. Checking an item off marks that row done. It does not write a `list_inclusion`.
 - `list_inclusion` is an append-only log written when an item is **added** to a list. `included_at` is that timestamp. These rows are the frequency tracker (F3, F4). "Placed in cart" in v1 means this add.
 - Deleting a list deletes its `needed_item` rows. Inclusion rows stay, with `list_id` set null, so counts survive across lists (F4).
+- Clearing a list (F8) deletes that list's `needed_item` rows and leaves the `grocery_list` row. Inclusion rows stay, still pointing at that list, because those Additions happened. Clearing writes no new Addition. It is not a new trip.
 - `archived_at` null means the list is an Active list. Setting it archives the list (F2a). Needed items and inclusions stay. The dashboard shows Active lists; Archived lists are the history of finished trips. A Shopper can keep several Active lists at once.
 - `list_inclusion` is **immutable** truth. `item_trend` is a **derived, recomputable** cache, updated when a new inclusion lands, so a list read does not rescan history. `cadence_days` and `next_due_at` stay null until a second inclusion makes an interval possible. Additions of the same item within 12 hours of the first addition in a session (even across multiple lists) are collapsed into a single inclusion when computing `item_trend`, so `inclusion_count` there counts sessions, not raw adds, and one sitting does not skew `cadence_days` toward zero (see [`../tradeoffs.md`](../tradeoffs.md)).
 - `item_name` is the join key for now, normalized (lowercased, whitespace collapsed) so `Milk` and `milk` are one item while `2% milk` stays separate. A canonical food id can be introduced later (PRD 03/04) as labels on an item, never by merging histories. See [ADR 0001](../adr/0001-item-identity-by-normalized-name.md).

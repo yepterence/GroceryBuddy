@@ -86,6 +86,9 @@ Product feel and layout in `src/styles/theme.css` and list components (`GroceryD
 
 - [ ] **List delete as an “×” control** — Replace the text “Delete” button with a compact dismiss control (match `Banner` dismiss styling where it fits). Position it in the list header row (title left, × right) so lists read as cards, not title + stray button.
 - [ ] **Per-item remove** — Add an × on each line next to the checkbox and label; wire to store + API. Today the API has no `DELETE /items/<id>` (only PATCH check and list delete); add backend + `requests.ts` if needed, then style the row as a flex line (checkbox · name · remove).
+- [ ] **Suggestion and new-item on one row** — When a Suggestion bubble is showing, do not put the checkbox and New Item field on the next line. Place them on the same row as the bubble (create form and saved lists). That shared row is what a later animation needs to substitute the Suggestion in as the new list item.
+- [ ] **Edit a saved list in the create form** — Choosing a previous list loads it back into the create form with its title and items already filled in, so the Shopper continues in the same place they build a list. Saving updates that list rather than creating a second copy.
+- [ ] **Feature flags for free and paid** — A custom hook turns specific features on or off, so a free tier and a paid tier can ship from the same app. Call sites ask the hook instead of scattering tier checks.
 - [ ] **Visual theme (“Sunday market”)** — Warm, personable grocery-app look (extend/replace the current generic sans + `#6CBDE9` blocks in `theme.css`):
   - **Palette:** page `#faf6f0` (cream), surface/cards `#fff` with soft shadow, text `#2c2825`, muted `#6b6560`, primary `#3d7a5f` (sage), accent/hover `#c4713a` (terracotta), error/success aligned with existing banner hues.
   - **Type:** one friendly rounded sans (e.g. **Nunito** or **DM Sans** via Google Fonts) for headings and UI; slightly larger list titles.

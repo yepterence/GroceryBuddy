@@ -91,23 +91,36 @@ recommendation = {
 **Where.** Inside a list while it is being built (the create form, before it is saved) and on
 saved lists. Never as a standalone feed.
 
-**When.** Only once the list shows enough **grocery intent**, recomputed as each Item is added,
-so a party or event list does not get milk suggestions. PoC rule (word lists and thresholds
-kept in one place so they can be tuned):
+**When.** Only once the list shows enough **grocery intent**, recomputed as each Item is added.
+A party or a holiday can still be a grocery trip: an event word does not hide Suggestions.
+PoC rule (word lists and thresholds kept in one place so they can be tuned):
 
 - **Title signal:** a grocery word in the title (`grocery`, `groceries`, `weekly`, `shop`,
-  `market`, `food`, `costco`) shows suggestions. An event word (`party`, `bbq`, `birthday`,
-  `potluck`, `christmas`) always hides them, even when the title also has a grocery word.
-  Words match as whole words, ignoring capitalization, so `workshop` is not `shop`. The word
-  lists are English. A title in another language, or a title with no spaces between words,
-  matches neither list, and the decision falls to the item signal.
+  `market`, `food`, `costco`) shows re-purchase Suggestions. An occasion word (`party`,
+  `bbq`, `birthday`, `potluck`, `christmas`) does not hide them, and it does not by itself
+  show the weekly re-purchase list. It selects the seasonal companions below. Words match as
+  whole words, ignoring capitalization, so `workshop` is not `shop`. The word lists are
+  English. A title in another language, or a title with no spaces between words, matches
+  neither list, and the decision falls to the item signal.
 - **Item signal:** only Items the Shopper typed (`source = manual`) count, so accepting a
-  Suggestion cannot raise intent. With at least 2 of those, show Suggestions when at least
-  half are Items the Shopper has added before. On a saved list, "added before" means an
-  Addition on some other list, so a list does not count its own Items as familiar. On the
-  create form the list is not saved yet, so every prior Addition counts. Familiarity is an
-  exact match against this Shopper's own history: gibberish and words they have never used
-  are unfamiliar, and an Item in any language counts once they have added it before.
+  Suggestion cannot raise intent. Grocery items count even when the Shopper has never added
+  them before, from a short staple list kept with the word lists (`milk`, `bread`, `eggs`,
+  `butter`, `rice`, `cheese`, and the same words inside a longer name such as `oat milk`).
+  Hardware and other non-grocery Items are ignored for this count, so one list that holds
+  both still starts grocery Suggestions once it has at least 2 grocery Items. With at least
+  2 typed Items that are not on the staple list, show Suggestions when at least half are
+  Items the Shopper has added before. On a saved list, "added before" means an Addition on
+  some other list, so a list does not count its own Items as familiar. On the create form
+  the list is not saved yet, so every prior Addition counts. Familiarity is an exact match
+  against this Shopper's own history: gibberish and words they have never used are
+  unfamiliar, and an Item in any language counts once they have added it before.
+- **Seasonal companions:** while an occasion list is being built, pair a grocery Item on it
+  with Items commonly bought at that time of year. Those companions come from one shared
+  list, grouped by occasion word (a Christmas list includes turkey, cranberry sauce,
+  stuffing, potatoes, and gravy; a barbecue list includes buns, burgers, and the usual
+  condiments). The list is English and lives with the other word lists so it can be tuned.
+  Weekly re-purchase Suggestions still wait for grocery intent. The occasion title alone
+  does not dump the weekly staples onto the list.
 
 **Computed where.** The list opens with one `GET /recommendations/repurchase?user_id=`, which
 returns the due suggestions (dismissals already applied) and the Shopper's known Item names.
@@ -150,6 +163,7 @@ with `source = suggestion`), records the accepted Outcome right away, and a bann
 | F6 | (Optional) blend in `purchase_history` when checkout data is available |
 | F7 | (Later, after flyer matching, auth and mobile) When a dismissed item appears in this week's flyer, offer it again with the price as the reason, optionally as a notification |
 | F8 | (Later) Re-rank suggestions on the server as the draft list changes, instead of the PoC's single fetch when the list opens |
+| F9 | For an occasion title, suggest Items from the seasonal companion list (§4a) that pair with the grocery Items already on the list. Showing those companions in the Suggestion slot is not built yet |
 
 ## 6. Data Model
 
@@ -194,10 +208,12 @@ every outcome points at exactly what they saw. Decided 2026-11-02.
 - Reusing a list by unchecking its Items writes no Addition (`set_item_checked`), so Cadence
   never sees the repeat, and the unchecked Items stay Open and block their own Suggestions.
   A "shop again" that copies the list into a new one is the likely fix. Not in v1.
+  Clearing a list ([PRD 01](./01-core-item-tracking.md) F8) empties it and writes no Addition
+  either. It is a fresh empty list, not a new trip.
 - Shared lists: whose familiarity and whose Cadence drive the Suggestions? Sharing is not
   built ([ADR 0002](../adr/0002-anonymous-device-bound-shopper.md)).
-- Item category as a later intent signal, for a party list made of familiar snacks, once
-  PRD 03 can label Items.
+- The staple list is the v1 way to tell a grocery Item from hardware on a mixed list.
+  A fuller Item category, once PRD 03 can label Items, can replace that list.
 - Titles in languages other than English, including scripts with no spaces between words.
   Out of scope for v1. See the English-only caveat in the [PRD index](./README.md).
 
