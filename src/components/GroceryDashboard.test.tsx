@@ -205,8 +205,8 @@ describe("GroceryDashboard", () => {
       id: "list-3",
       title: "Saturday trip",
       contents: [
-        { id: "b1", name: "Bread", checked: false, source: "manual" },
-        { id: "b2", name: "Butter", checked: false, source: "manual" },
+        { id: "b1", name: "doodh", checked: false, source: "manual" },
+        { id: "b2", name: "atta", checked: false, source: "manual" },
       ],
     };
 
@@ -303,7 +303,7 @@ describe("GroceryDashboard", () => {
       client = makeClient();
       vi.mocked(fetchRepurchaseSuggestions).mockResolvedValue({
         suggestions: [oatMilk],
-        knownItemNames: ["bread", "butter"],
+        knownItemNames: ["doodh", "atta"],
       });
       render(<Harness />);
       await screen.findByText("Saturday trip");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasGroceryIntent } from "./intent";
+import { hasGroceryIntent, seasonalCompanions } from "./intent";
 import { ItemSource } from "./types";
 
 const item = (name: string, source: ItemSource = "manual") => ({ name, source });
@@ -18,11 +18,13 @@ describe("hasGroceryIntent", () => {
       expect(intent("COSTCO", [], [])).toBe(true);
     });
 
-    it("lets an event word override a grocery word", () => {
-      expect(intent("Birthday groceries", [item("milk"), item("eggs")], ["milk", "eggs"])).toBe(
-        false,
-      );
+    it("keeps weekly re-purchase off an occasion title until grocery items are on the list", () => {
       expect(intent("Christmas party", [], [])).toBe(false);
+      expect(seasonalCompanions("Christmas party")).toEqual(
+        expect.arrayContaining(["turkey", "cranberry sauce", "chips"]),
+      );
+      expect(intent("Christmas party", [item("milk"), item("bread")], [])).toBe(true);
+      expect(intent("Birthday groceries", [], [])).toBe(true);
     });
 
     it("matches whole words, so workshop is not a shop", () => {
@@ -34,7 +36,8 @@ describe("hasGroceryIntent", () => {
     it("falls through to the items when the title is a date or another language", () => {
       const known = [item("milk"), item("bread")];
       expect(intent("Nov 13", known, ["milk", "bread"])).toBe(true);
-      expect(intent("2026-11-13", known, [])).toBe(false);
+      expect(intent("2026-11-13", [item("doodh"), item("atta")], [])).toBe(false);
+      expect(intent("2026-11-13", known, [])).toBe(true);
       expect(intent("doodh sabzi", known, ["milk", "bread"])).toBe(true);
       expect(intent("किराना", known, ["milk", "bread"])).toBe(true);
       expect(intent("每周买菜", known, ["milk", "bread"])).toBe(true);
@@ -44,11 +47,24 @@ describe("hasGroceryIntent", () => {
 
   describe("items the Shopper typed", () => {
     it("shows Suggestions once at least half of two typed Items were added before", () => {
-      expect(intent("Saturday trip", [item("Milk"), item("bread")], ["milk"])).toBe(true);
-      expect(intent("Saturday trip", [item("milk")], ["milk"])).toBe(false);
+      expect(intent("Saturday trip", [item("doodh"), item("atta")], ["doodh"])).toBe(true);
+      expect(intent("Saturday trip", [item("doodh")], ["doodh"])).toBe(false);
       expect(
-        intent("Saturday trip", [item("milk"), item("bread"), item("tape")], ["milk"]),
+        intent("Saturday trip", [item("doodh"), item("atta"), item("tape")], ["doodh"]),
       ).toBe(false);
+    });
+
+    it("starts re-purchase once a mixed list contains grocery items", () => {
+      expect(intent("Garage run", [item("nails"), item("screws")], [])).toBe(false);
+      expect(intent("Garage run", [item("nails"), item("screws"), item("milk")], [])).toBe(
+        false,
+      );
+      expect(
+        intent("Garage run", [item("nails"), item("screws"), item("milk"), item("bread")], []),
+      ).toBe(true);
+      expect(
+        intent("Christmas party", [item("nails"), item("screws"), item("Milk"), item("bread")], []),
+      ).toBe(true);
     });
 
     it("ignores accepted Suggestions, so accepting one cannot raise intent", () => {
@@ -67,8 +83,9 @@ describe("hasGroceryIntent", () => {
       ).toBe(true);
     });
 
-    it("hides Suggestions for a new Shopper when the title says nothing", () => {
-      expect(intent("Saturday trip", [item("milk"), item("bread")], [])).toBe(false);
+    it("hides Suggestions for a new Shopper when the items are not groceries", () => {
+      expect(intent("Saturday trip", [item("doodh"), item("atta")], [])).toBe(false);
+      expect(intent("Saturday trip", [item("milk"), item("bread")], [])).toBe(true);
       expect(intent("Weekly", [], [])).toBe(true);
     });
 

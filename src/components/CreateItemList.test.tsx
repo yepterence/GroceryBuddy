@@ -213,14 +213,22 @@ describe("CreateItemList suggestions", () => {
     );
   });
 
-  it("hides Suggestions when the title is an event, even with familiar Items", async () => {
-    offer(oatMilk);
+  it("shows Suggestions on an event list once grocery items are on it", async () => {
+    vi.mocked(fetchRepurchaseSuggestions).mockResolvedValue({
+      suggestions: [oatMilk],
+      knownItemNames: ["oat milk"],
+    });
     const user = userEvent.setup();
     render(<CreateItemList />);
     await user.type(screen.getByPlaceholderText("Title"), "Birthday party");
+    await addItems(user, "Nails");
+    expect(screen.queryByRole("group", { name: "Suggestion" })).not.toBeInTheDocument();
+
     await addItems(user, "Bread", "Butter");
 
-    expect(screen.queryByRole("group", { name: "Suggestion" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("group", { name: "Suggestion" })).toHaveTextContent(
+      "oat milk",
+    );
   });
 
   it("hides Suggestions when the typed Items were never added before", async () => {
