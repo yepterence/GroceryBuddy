@@ -1,11 +1,12 @@
 import { create, StateCreator } from "zustand";
 import { persist } from "zustand/middleware";
-import { GroceryList } from "../types";
+import { GroceryList, Item } from "../types";
 
 interface ListStore {
   groceryLists: GroceryList[];
   addGroceryList: (groceryList: GroceryList) => void;
   setGroceryLists: (groceryLists: GroceryList[]) => void;
+  addItemToList: (listId: string, item: Item) => void;
   toggleItemChecked: (listId: string, itemId: string) => void;
   updateListTitle: (listId: string, title: string) => void;
   removeItem: (listId: string, itemId: string) => void;
@@ -21,6 +22,13 @@ const store: StateCreator<ListStore> = (set) => ({
   },
   setGroceryLists: (groceryLists) => {
     set({ groceryLists });
+  },
+  addItemToList: (listId, item) => {
+    set((state) => ({
+      groceryLists: state.groceryLists.map((list) =>
+        list.id === listId ? { ...list, contents: [...list.contents, item] } : list,
+      ),
+    }));
   },
   toggleItemChecked: (listId: string, itemId: string) => {
     set((state) => ({

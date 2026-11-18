@@ -22,6 +22,7 @@ interface ApiItem {
   id: string;
   name: string;
   checked: boolean;
+  source?: ItemSource;
 }
 
 interface ApiList {
@@ -56,6 +57,7 @@ const toItem = (item: ApiItem): Item => ({
   id: item.id,
   name: item.name,
   checked: item.checked,
+  ...(item.source ? { source: item.source } : {}),
 });
 
 const toList = (list: ApiList): GroceryList => ({
@@ -130,23 +132,35 @@ export const removeList = async (listId: string): Promise<void> => {
 };
 
 /** POST /lists/<id>/items: add an item to an existing list. */
-export const addItem = async (listId: string, name: string): Promise<Item> => {
+export const addItem = async (
+  listId: string,
+  name: string,
+  source: ItemSource = "manual",
+): Promise<Item> => {
   const data = await request<{ item: ApiItem }>(
     `/lists/${encodeURIComponent(listId)}/items`,
-    jsonInit("POST", { user_id: getUserId(), name }),
+    jsonInit("POST", { user_id: getUserId(), name, source }),
   );
   return toItem(data.item);
 };
 
-/** GET /recommendations/repurchase: due Suggestions (dismissals already applied). */
-export const fetchRepurchaseSuggestions = async (): Promise<{
+/**
+ * GET /recommendations/repurchase: due Suggestions (dismissals already applied).
+ * `listId` asks for known names that leave out that saved list's own Additions.
+ */
+export const fetchRepurchaseSuggestions = async (
+  listId?: string,
+): Promise<{
   suggestions: Suggestion[];
   knownItemNames: string[];
 }> => {
+  const query = listId
+    ? `${userQuery()}&list_id=${encodeURIComponent(listId)}`
+    : userQuery();
   const data = await request<{
     suggestions: Suggestion[];
     known_item_names: string[];
-  }>(`/recommendations/repurchase?${userQuery()}`);
+  }>(`/recommendations/repurchase?${query}`);
   return { suggestions: data.suggestions, knownItemNames: data.known_item_names };
 };
 

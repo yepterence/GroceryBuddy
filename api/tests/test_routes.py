@@ -60,6 +60,7 @@ async def test_create_list_accepts_names_and_name_source_objects(client, user_id
     items = ["milk", {"name": " eggs ", "source": "suggestion"}, {"name": "bread"}]
     saved = await create_list(client, user_id, items=items)
     assert [i["name"] for i in saved["items"]] == ["milk", "eggs", "bread"]
+    assert [i["source"] for i in saved["items"]] == ["manual", "suggestion", "manual"]
 
     assert await inclusion_sources(saved["id"]) == {
         "milk": "manual",
@@ -174,6 +175,7 @@ async def test_add_item_appends_to_list(client, user_id):
     assert resp.status == 201
     assert resp.json["item"]["name"] == "cheese"
     assert resp.json["item"]["checked"] is False
+    assert resp.json["item"]["source"] == "manual"
 
     _, resp = await client.get(f"/lists/{saved['id']}", params={"user_id": user_id})
     assert [i["name"] for i in resp.json["list"]["items"]] == ["milk", "cheese"]
@@ -186,6 +188,7 @@ async def test_add_item_records_accepted_suggestion_source(client, user_id):
         json={"user_id": user_id, "name": "oat milk", "source": "suggestion"},
     )
     assert resp.status == 201
+    assert resp.json["item"]["source"] == "suggestion"
     assert await inclusion_sources(saved["id"]) == {"oat milk": "suggestion"}
 
 
@@ -373,6 +376,34 @@ async def test_repurchase_sorts_by_score_and_caps_at_five(client, user_id):
     scores = [s["score"] for s in body["suggestions"]]
     assert len(scores) == 5
     assert scores == sorted(scores, reverse=True)
+
+
+async def test_repurchase_known_names_leave_out_the_saved_list(client, user_id):
+    await seed_history(user_id, "oat milk", 21, 14, 7)
+    saved = await create_list(client, user_id, title="Saturday", items=["bread", "butter"])
+    # bread is also on another list, so it stays familiar when Saturday is excluded.
+    await create_list(client, user_id, title="Backup", items=["bread"])
+
+    everywhere = await suggested(client, user_id)
+    assert "bread" in everywhere["known_item_names"]
+    assert "butter" in everywhere["known_item_names"]
+
+    _, resp = await client.get(
+        "/recommendations/repurchase",
+        params={"user_id": user_id, "list_id": saved["id"]},
+    )
+    assert resp.status == 200, resp.text
+    known = resp.json["known_item_names"]
+    assert "butter" not in known
+    assert "bread" in known
+    assert "oat milk" in known
+
+
+async def test_repurchase_rejects_a_bad_list_id(client, user_id):
+    _, resp = await client.get(
+        "/recommendations/repurchase", params={"user_id": user_id, "list_id": "nope"}
+    )
+    assert resp.status == 400
 
 
 async def test_repurchase_requires_valid_user_id(client):

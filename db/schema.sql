@@ -12,14 +12,22 @@ CREATE TABLE IF NOT EXISTS grocery_list (
     title TEXT NOT NULL
 );
 
+-- source: typed by the Shopper, or an accepted Suggestion (ADR 0003). The column
+-- default covers rows written before source existed.
 CREATE TABLE IF NOT EXISTS needed_item (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES "user" (id) ON DELETE CASCADE,
     list_id UUID NOT NULL REFERENCES grocery_list (id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     checked BOOLEAN NOT NULL DEFAULT FALSE,
+    source TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'suggestion')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- CREATE TABLE does not add columns to a table that already exists.
+ALTER TABLE needed_item
+    ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual'
+    CHECK (source IN ('manual', 'suggestion'));
 
 -- Append-only. Written when an item is added to a list, not when it is checked off.
 -- list_id becomes null if that list is later deleted so the history row survives.

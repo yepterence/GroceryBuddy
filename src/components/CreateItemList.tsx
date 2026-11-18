@@ -14,14 +14,9 @@ import {
   fetchRepurchaseSuggestions,
   recordOutcome,
 } from "../requests";
-import { normalizeItemName } from "../items";
 import Banner from "./Banner";
 import SuggestionBubble from "./Suggestion";
-
-// Suggestions wait for this many Items on the draft (PRD 02 §4a, before grocery intent).
-const MIN_ITEMS_FOR_SUGGESTIONS = 2;
-// An untouched Suggestion collapses to a chip after this long; it is not dismissed.
-const SUGGESTION_COLLAPSE_MS = 10_000;
+import { useSuggestionSlot } from "../useSuggestionSlot";
 
 // Outcomes are best effort: a lost one only means the Item may be suggested again.
 const sendOutcome = (suggestion: Suggestion, action: "accepted" | "dismissed") => {
@@ -37,44 +32,37 @@ const CreateItemList = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  // Item names the Shopper dismissed on this draft; the server keeps the lasting "no".
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [knownItemNames, setKnownItemNames] = useState<string[]>([]);
   // Accepted Suggestions by draft Item id, reported as accepted once the list is saved.
   const [accepted, setAccepted] = useState<Record<string, Suggestion>>({});
-  const [collapsedFor, setCollapsedFor] = useState<string | null>(null);
   const nextInputRef = useRef<HTMLInputElement>(null);
 
   const loadSuggestions = useCallback(() => {
     fetchRepurchaseSuggestions()
-      .then((found) => setSuggestions(found.suggestions))
-      .catch(() => setSuggestions([]));
+      .then((found) => {
+        setSuggestions(found.suggestions);
+        setKnownItemNames(found.knownItemNames);
+      })
+      .catch(() => {
+        setSuggestions([]);
+        setKnownItemNames([]);
+      });
   }, []);
 
   useEffect(() => {
     loadSuggestions();
   }, [loadSuggestions]);
 
-  const onDraft = new Set(items.map((item) => normalizeItemName(item.name)));
-  const nextSuggestion =
-    items.length >= MIN_ITEMS_FOR_SUGGESTIONS
-      ? suggestions.find(
-          (s) =>
-            !onDraft.has(s.payload.item_name) && !dismissed.has(s.payload.item_name),
-        )
-      : undefined;
-  // The Suggestion only sits in the slot while the Shopper has not typed into it.
-  const shown = newItem === "" ? nextSuggestion : undefined;
-  const shownName = shown?.payload.item_name ?? null;
-  const collapsed = shownName !== null && collapsedFor === shownName;
-
-  useEffect(() => {
-    if (shownName === null || collapsed) return;
-    const timer = setTimeout(() => setCollapsedFor(shownName), SUGGESTION_COLLAPSE_MS);
-    return () => clearTimeout(timer);
-  }, [shownName, collapsed]);
+  const { shown, collapsed, dismiss, noteDraftChange, expand, reset } = useSuggestionSlot({
+    title,
+    items,
+    suggestions,
+    knownItemNames,
+    draftText: newItem,
+  });
 
   const dismissSuggestion = (suggestion: Suggestion) => {
-    setDismissed((prev) => new Set(prev).add(suggestion.payload.item_name));
+    dismiss(suggestion);
     sendOutcome(suggestion, "dismissed");
   };
 
@@ -96,7 +84,8 @@ const CreateItemList = () => {
   // Typing over a Suggestion is a dismissal, the same lasting "no" as the button.
   const handleNewItemChange = (e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (shown && value !== "") dismissSuggestion(shown);
+    const typedOver = noteDraftChange(value);
+    if (typedOver) sendOutcome(typedOver, "dismissed");
     setNewItem(value);
   };
 
@@ -150,8 +139,7 @@ const CreateItemList = () => {
       setTitle("");
       setItems([]);
       setAccepted({});
-      setDismissed(new Set());
-      setCollapsedFor(null);
+      reset();
       setNotice(null);
       loadSuggestions();
     } catch (err) {
@@ -194,7 +182,7 @@ const CreateItemList = () => {
             collapsed={collapsed}
             onAccept={() => acceptSuggestion(shown)}
             onDismiss={() => dismissSuggestion(shown)}
-            onExpand={() => setCollapsedFor(null)}
+            onExpand={expand}
           />
         )}
         {title.trim() && (
