@@ -8,6 +8,8 @@ interface SuggestionBubbleProps {
   onAccept: () => void;
   onDismiss: () => void;
   onExpand: () => void;
+  /** Sit inside a parent row instead of being its own list item. */
+  inline?: boolean;
 }
 
 // Horizontal travel, in px, that counts as a swipe-away.
@@ -19,14 +21,17 @@ const SuggestionBubble = ({
   onAccept,
   onDismiss,
   onExpand,
+  inline = false,
 }: SuggestionBubbleProps) => {
   const swipeStartX = useRef<number | null>(null);
   const swiped = useRef(false);
   const name = suggestion.payload.item_name;
 
+  const Slot = inline ? "div" : "li";
+
   if (collapsed) {
     return (
-      <li className="suggestion-slot">
+      <Slot className="suggestion-slot">
         <button
           type="button"
           className="suggestion-chip"
@@ -35,7 +40,7 @@ const SuggestionBubble = ({
         >
           {name}
         </button>
-      </li>
+      </Slot>
     );
   }
 
@@ -63,7 +68,7 @@ const SuggestionBubble = ({
   };
 
   return (
-    <li className="suggestion-slot">
+    <Slot className="suggestion-slot">
       <div
         className="suggestion-bubble"
         role="group"
@@ -90,7 +95,7 @@ const SuggestionBubble = ({
           ×
         </button>
       </div>
-    </li>
+    </Slot>
   );
 };
 

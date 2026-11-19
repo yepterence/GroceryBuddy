@@ -110,6 +110,16 @@ const CreateItemList = () => {
     );
   };
 
+  const removeDraftItem = (itemId: string) => {
+    setItems(items.filter((item) => item.id !== itemId));
+    setAccepted((prev) => {
+      if (!(itemId in prev)) return prev;
+      const next = { ...prev };
+      delete next[itemId];
+      return next;
+    });
+  };
+
   const handleTitleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -156,6 +166,7 @@ const CreateItemList = () => {
         <input
           type="text"
           name="title"
+          aria-label="Title"
           placeholder="Title"
           value={title}
           onChange={handleTitleChange}
@@ -173,41 +184,58 @@ const CreateItemList = () => {
                 className="input-list-checkbox"
                 onChange={() => toggleItemChecked(item.id)}
               />
-              {item.name}
+              <span>{item.name}</span>
+              <button
+                type="button"
+                className="icon-dismiss"
+                aria-label={`Remove ${item.name}`}
+                onClick={() => removeDraftItem(item.id)}
+              >
+                ×
+              </button>
             </li>
           ))}
-        {shown && (
-          <SuggestionBubble
-            suggestion={shown}
-            collapsed={collapsed}
-            onAccept={() => acceptSuggestion(shown)}
-            onDismiss={() => dismissSuggestion(shown)}
-            onExpand={expand}
-          />
-        )}
-        {title.trim() && (
-          <li className="list-item">
-            <input
-              type="checkbox"
-              checked={false}
-              disabled
-              className="input-list-checkbox"
-              aria-hidden="true"
-              tabIndex={-1}
-            />
-            <input
-              type="text"
-              className="new-item-input"
-              placeholder="New Item"
-              value={newItem}
-              onChange={handleNewItemChange}
-              onKeyDown={handleKeyDown}
-              ref={nextInputRef}
-            />
+        {(shown || title.trim()) && (
+          <li className={shown ? "list-item composer-row" : "list-item"}>
+            {shown && (
+              <SuggestionBubble
+                inline
+                suggestion={shown}
+                collapsed={collapsed}
+                onAccept={() => acceptSuggestion(shown)}
+                onDismiss={() => dismissSuggestion(shown)}
+                onExpand={expand}
+              />
+            )}
+            {title.trim() && (
+              <>
+                <input
+                  type="checkbox"
+                  checked={false}
+                  disabled
+                  className="input-list-checkbox"
+                  aria-hidden="true"
+                  tabIndex={-1}
+                />
+                <input
+                  type="text"
+                  className="new-item-input"
+                  placeholder="New Item"
+                  value={newItem}
+                  onChange={handleNewItemChange}
+                  onKeyDown={handleKeyDown}
+                  ref={nextInputRef}
+                />
+              </>
+            )}
           </li>
         )}
-        <button type="submit" onClick={handleFormSubmit} disabled={saving}>
-          Add
+        <button
+          type="submit"
+          onClick={handleFormSubmit}
+          disabled={saving || !title.trim()}
+        >
+          Create list
         </button>
       </form>
     </div>

@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CreateItemList from "./CreateItemList";
+import { seasonalCompanions } from "../intent";
 import { useListStore } from "../store/applicationStore";
 import { createList, fetchRepurchaseSuggestions, recordOutcome } from "../requests";
 import { Suggestion } from "../types";
+import { useSuggestionSlot } from "../useSuggestionSlot";
 
 vi.mock("../requests", () => ({
   createList: vi.fn(),
@@ -67,10 +69,35 @@ describe("CreateItemList", () => {
     expect(screen.getByPlaceholderText("New Item")).toBeInTheDocument();
   });
 
+  it("keeps Create list disabled until the title has text", () => {
+    render(<CreateItemList />);
+    expect(screen.getByRole("button", { name: "Create list" })).toBeDisabled();
+  });
+
+  it("saves a title-only list with no items", async () => {
+    const emptyList = {
+      id: "server-list-id",
+      title: "Sunday market",
+      contents: [],
+    };
+    vi.mocked(createList).mockResolvedValue(emptyList);
+    render(<CreateItemList />);
+    const user = userEvent.setup();
+    await user.type(screen.getByPlaceholderText("Title"), "Sunday market");
+    await user.click(screen.getByRole("button", { name: "Create list" }));
+
+    await waitFor(() =>
+      expect(useListStore.getState().groceryLists).toHaveLength(1),
+    );
+    expect(createList).toHaveBeenCalledWith("Sunday market", []);
+    expect(useListStore.getState().groceryLists[0]).toEqual(emptyList);
+    expect(screen.getByPlaceholderText("Title")).toHaveValue("");
+  });
+
   it("saves the list through the API and stores the server's copy", async () => {
     render(<CreateItemList />);
     const user = await fillForm();
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(screen.getByRole("button", { name: "Create list" }));
 
     await waitFor(() =>
       expect(useListStore.getState().groceryLists).toHaveLength(1),
@@ -85,7 +112,7 @@ describe("CreateItemList", () => {
   it("clears the form after a successful save", async () => {
     render(<CreateItemList />);
     const user = await fillForm();
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(screen.getByRole("button", { name: "Create list" }));
 
     await waitFor(() =>
       expect(screen.getByPlaceholderText("Title")).toHaveValue(""),
@@ -100,7 +127,7 @@ describe("CreateItemList", () => {
     );
     render(<CreateItemList />);
     const user = await fillForm();
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(screen.getByRole("button", { name: "Create list" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "database unavailable, try again shortly",
@@ -115,7 +142,7 @@ describe("CreateItemList", () => {
     vi.mocked(createList).mockRejectedValue(new Error("boom"));
     render(<CreateItemList />);
     const user = await fillForm();
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(screen.getByRole("button", { name: "Create list" }));
     await screen.findByRole("alert");
 
     await user.click(screen.getByRole("button", { name: "Dismiss error" }));
@@ -130,17 +157,27 @@ describe("CreateItemList", () => {
     render(<CreateItemList />);
     const user = await fillForm();
 
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(screen.getByRole("button", { name: "Create list" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("boom");
 
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(screen.getByRole("button", { name: "Create list" }));
     await waitFor(() =>
       expect(screen.queryByRole("alert")).not.toBeInTheDocument(),
     );
     expect(useListStore.getState().groceryLists).toHaveLength(1);
   });
 
-  it("disables the Add button while the save is in flight", async () => {
+  it("removes a draft item without saving", async () => {
+    render(<CreateItemList />);
+    const user = await fillForm();
+
+    await user.click(screen.getByRole("button", { name: "Remove Milk" }));
+
+    expect(screen.queryByText("Milk")).not.toBeInTheDocument();
+    expect(createList).not.toHaveBeenCalled();
+  });
+
+  it("disables the Create list button while the save is in flight", async () => {
     let finish: (value: typeof savedList) => void = () => {};
     vi.mocked(createList).mockReturnValue(
       new Promise((resolve) => {
@@ -149,13 +186,16 @@ describe("CreateItemList", () => {
     );
     render(<CreateItemList />);
     const user = await fillForm();
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(screen.getByRole("button", { name: "Create list" }));
 
-    expect(screen.getByRole("button", { name: "Add" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Create list" })).toBeDisabled();
     finish(savedList);
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Add" })).toBeEnabled(),
+      expect(screen.getByPlaceholderText("Title")).toHaveValue(""),
     );
+    expect(screen.getByRole("button", { name: "Create list" })).toBeDisabled();
+    await user.type(screen.getByPlaceholderText("Title"), "Next");
+    expect(screen.getByRole("button", { name: "Create list" })).toBeEnabled();
   });
 });
 
@@ -226,9 +266,43 @@ describe("CreateItemList suggestions", () => {
 
     await addItems(user, "Bread", "Butter");
 
-    expect(await screen.findByRole("group", { name: "Suggestion" })).toHaveTextContent(
-      "oat milk",
+    const bubble = await screen.findByRole("group", { name: "Suggestion" });
+    expect(bubble).toHaveTextContent("cake");
+    expect(bubble).not.toHaveTextContent("oat milk");
+  });
+
+  it("keeps suggesting items that match seasonal event", async () => {
+    const bread = suggestion("bread", 0.8);
+    const knownItemNames = ["corn", "cheese", "bread"];
+    vi.mocked(fetchRepurchaseSuggestions).mockResolvedValue({
+      suggestions: [bread],
+      knownItemNames,
+    });
+    const user = userEvent.setup();
+    render(<CreateItemList />);
+    await user.type(screen.getByRole("textbox", { name: "Title" }), "Thanksgiving");
+    const onList = ["turkey", "stuffing", "corn", "cheese"];
+    await addItems(user, ...onList);
+
+    const bubble = await screen.findByRole("group", { name: "Suggestion" });
+    const shownName = seasonalCompanions("Thanksgiving").find(
+      (name) => !onList.includes(name) && bubble.textContent?.includes(name),
     );
+    expect(shownName).toBeDefined();
+    expect(bubble).not.toHaveTextContent(bread.payload.item_name);
+
+    // Stuffing on the list makes the occasion item the closer need, so it outranks bread.
+    const { result } = renderHook(() =>
+      useSuggestionSlot({
+        title: "Thanksgiving",
+        items: onList.map((name) => ({ id: name, name, checked: false, source: "manual" })),
+        suggestions: [bread],
+        knownItemNames,
+        draftText: "",
+      }),
+    );
+    expect(result.current.shown?.payload.item_name).toBe(shownName);
+    expect(result.current.shown?.score).toBeGreaterThan(bread.score);
   });
 
   it("hides Suggestions when the typed Items were never added before", async () => {
@@ -261,7 +335,7 @@ describe("CreateItemList suggestions", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Added to Saturday trip");
     expect(screen.queryByRole("group", { name: "Suggestion" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(screen.getByRole("button", { name: "Create list" }));
     await waitFor(() => expect(outcomes("accepted")).toHaveLength(1));
     expect(createList).toHaveBeenCalledWith("Saturday trip", [
       { name: "Bread", source: "manual" },
@@ -283,7 +357,7 @@ describe("CreateItemList suggestions", () => {
 
     const names = screen
       .getAllByRole("listitem")
-      .map((li) => li.textContent)
+      .map((li) => li.textContent?.replace(/×/g, "") ?? "")
       .filter(Boolean);
     expect(names).toEqual(["Bread", "Butter", "oat milk", "eggs"]);
     expect(screen.queryByRole("group", { name: "Suggestion" })).not.toBeInTheDocument();
@@ -311,7 +385,7 @@ describe("CreateItemList suggestions", () => {
     await addItems(user, "Bread", "Butter");
     await screen.findByRole("group", { name: "Suggestion" });
 
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(screen.getByRole("button", { name: "Create list" }));
 
     await waitFor(() => expect(useListStore.getState().groceryLists).toHaveLength(1));
     expect(recordOutcome).not.toHaveBeenCalled();
@@ -345,7 +419,7 @@ describe("CreateItemList suggestions", () => {
     await screen.findByRole("button", { name: "Add oat milk" });
 
     await addItems(user, "oat milk");
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(screen.getByRole("button", { name: "Create list" }));
 
     await waitFor(() => expect(createList).toHaveBeenCalled());
     expect(vi.mocked(createList).mock.calls[0][1]).toContainEqual({

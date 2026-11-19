@@ -7,6 +7,7 @@ import {
   fetchLists,
   fetchRepurchaseSuggestions,
   recordOutcome,
+  removeItem,
   removeList,
   setItemChecked,
 } from "../requests";
@@ -99,9 +100,10 @@ const SavedListAdder = ({
   };
 
   return (
-    <>
+    <li className={shown ? "list-item composer-row" : "list-item"}>
       {shown && (
         <SuggestionBubble
+          inline
           suggestion={shown}
           collapsed={collapsed}
           onAccept={() => accept(shown)}
@@ -112,32 +114,30 @@ const SavedListAdder = ({
           onExpand={expand}
         />
       )}
-      <li className="list-item">
-        <input
-          type="checkbox"
-          checked={false}
-          disabled
-          className="input-list-checkbox"
-          aria-hidden="true"
-          tabIndex={-1}
-        />
-        <input
-          type="text"
-          className="new-item-input"
-          placeholder="New Item"
-          aria-label={`New item on ${list.title}`}
-          value={newItem}
-          onChange={handleChange}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              commitTyped();
-            }
-          }}
-          ref={inputRef}
-        />
-      </li>
-    </>
+      <input
+        type="checkbox"
+        checked={false}
+        disabled
+        className="input-list-checkbox"
+        aria-hidden="true"
+        tabIndex={-1}
+      />
+      <input
+        type="text"
+        className="new-item-input"
+        placeholder="New Item"
+        aria-label={`New item on ${list.title}`}
+        value={newItem}
+        onChange={handleChange}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commitTyped();
+          }
+        }}
+        ref={inputRef}
+      />
+    </li>
   );
 };
 
@@ -145,6 +145,7 @@ const GroceryDashboard = ({ lists }: GroceryLists) => {
   const setGroceryLists = useListStore((state) => state.setGroceryLists);
   const toggleItemChecked = useListStore((state) => state.toggleItemChecked);
   const deleteList = useListStore((state) => state.deleteList);
+  const removeItemFromList = useListStore((state) => state.removeItem);
   // Errors from check/delete actions.
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -198,6 +199,16 @@ const GroceryDashboard = ({ lists }: GroceryLists) => {
     }
   };
 
+  const handleRemoveItem = async (listId: string, item: Item) => {
+    setActionError(null);
+    try {
+      await removeItem(item.id);
+      removeItemFromList(listId, item.id);
+    } catch (err) {
+      setActionError(messageFrom(err, "Could not remove the item."));
+    }
+  };
+
   return (
     <section className="lists-section">
       <Banner
@@ -234,11 +245,11 @@ const GroceryDashboard = ({ lists }: GroceryLists) => {
                   </button>
                   <button
                     type="button"
-                    className="button-delete"
+                    className="icon-dismiss"
                     aria-label={`Delete ${newList.title}`}
                     onClick={() => handleDelete(newList.id)}
                   >
-                    Delete
+                    ×
                   </button>
                 </div>
               </header>
@@ -254,6 +265,14 @@ const GroceryDashboard = ({ lists }: GroceryLists) => {
                       onChange={() => handleToggle(newList.id, item)}
                     />
                     <span>{item.name}</span>
+                    <button
+                      type="button"
+                      className="icon-dismiss"
+                      aria-label={`Remove ${item.name}`}
+                      onClick={() => handleRemoveItem(newList.id, item)}
+                    >
+                      ×
+                    </button>
                   </li>
                 ))}
                 {addingListId === newList.id && (

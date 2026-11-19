@@ -11,6 +11,7 @@ import {
   fetchLists,
   fetchRepurchaseSuggestions,
   recordOutcome,
+  removeItem,
   removeList,
   setItemChecked,
 } from "../requests";
@@ -20,6 +21,7 @@ import { GroceryList } from "../types";
 vi.mock("../requests", () => ({
   createList: vi.fn(),
   fetchLists: vi.fn(),
+  removeItem: vi.fn(),
   removeList: vi.fn(),
   setItemChecked: vi.fn(),
   addItem: vi.fn(),
@@ -59,6 +61,7 @@ describe("GroceryDashboard", () => {
     useListStore.setState({ groceryLists: [] });
     vi.mocked(fetchLists).mockResolvedValue([weekly]);
     vi.mocked(removeList).mockResolvedValue(undefined);
+    vi.mocked(removeItem).mockResolvedValue(undefined);
     vi.mocked(setItemChecked).mockResolvedValue({
       id: "item-1",
       name: "Milk",
@@ -183,6 +186,32 @@ describe("GroceryDashboard", () => {
 
       expect(await screen.findByRole("alert")).toHaveTextContent("list not found");
       expect(screen.getByText("Weekly")).toBeInTheDocument();
+    });
+  });
+
+  describe("removing an item", () => {
+    it("deletes the line through the API, then drops it from the list", async () => {
+      render(<Harness />);
+      await screen.findByText("Milk");
+      const user = userEvent.setup();
+
+      await user.click(screen.getByRole("button", { name: "Remove Milk" }));
+
+      expect(removeItem).toHaveBeenCalledWith("item-1");
+      await waitFor(() => expect(screen.queryByText("Milk")).not.toBeInTheDocument());
+      expect(screen.getByText("Eggs")).toBeInTheDocument();
+    });
+
+    it("keeps the line and shows an error if the remove fails", async () => {
+      vi.mocked(removeItem).mockRejectedValue(new Error("item not found"));
+      render(<Harness />);
+      await screen.findByText("Milk");
+      const user = userEvent.setup();
+
+      await user.click(screen.getByRole("button", { name: "Remove Milk" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("item not found");
+      expect(screen.getByText("Milk")).toBeInTheDocument();
     });
   });
 
@@ -337,7 +366,7 @@ describe("GroceryDashboard", () => {
       await user.type(screen.getByPlaceholderText("Title"), title);
       await user.type(screen.getByPlaceholderText("New Item"), item);
       fireEvent.keyDown(screen.getByPlaceholderText("New Item"), { key: "Enter" });
-      await user.click(screen.getByRole("button", { name: "Add" }));
+      await user.click(screen.getByRole("button", { name: "Create list" }));
     };
 
     // A reload wipes memory but keeps localStorage, which zustand's persist restores.
@@ -377,7 +406,7 @@ describe("GroceryDashboard", () => {
         await screen.findByRole("heading", { level: 3, name: "Saturday trip" }),
       ).toBeInTheDocument();
       expect(
-        screen.getAllByRole("listitem").some((li) => li.textContent === "Bread"),
+        screen.getAllByRole("listitem").some((li) => li.textContent?.replace(/×/g, "") === "Bread"),
       ).toBe(true);
       expect(createList).toHaveBeenCalledWith("Saturday trip", [
         { name: "Bread", source: "manual" },
