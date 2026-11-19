@@ -36,6 +36,7 @@ ROUTES = [
     ("delete", f"/lists/{OTHER}", {"params": {"user_id": UID}}, "delete_list"),
     ("post", f"/lists/{OTHER}/items", {"json": {"user_id": UID, "name": "a"}}, "add_item"),
     ("patch", f"/items/{OTHER}", {"json": {"user_id": UID, "checked": True}}, "set_item_checked"),
+    ("delete", f"/items/{OTHER}", {"params": {"user_id": UID}}, "delete_item"),
 ]
 
 

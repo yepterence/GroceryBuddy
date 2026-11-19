@@ -128,6 +128,29 @@ async def test_delete_list_cascades_items_but_keeps_inclusion_history(pool, uid)
     assert all(r["list_id"] is None for r in rows)  # ON DELETE SET NULL
 
 
+async def test_delete_item_removes_the_line_and_keeps_the_inclusion(pool, uid):
+    created = await db.create_list(uid, "Weekly", manual("milk", "eggs"))
+    list_id = uuid.UUID(created["id"])
+    milk_id = uuid.UUID(created["items"][0]["id"])
+    before = await trends(pool, uid)
+
+    assert await db.delete_item(uid, milk_id) is True
+
+    stored = await db.get_list(uid, list_id)
+    assert [i["name"] for i in stored["items"]] == ["eggs"]
+    rows = await inclusions(pool, uid)
+    assert sorted(r["item_name"] for r in rows) == ["eggs", "milk"]
+    assert await trends(pool, uid) == before
+
+
+async def test_delete_item_returns_false_when_missing_or_foreign(pool, uid):
+    created = await db.create_list(uid, "Weekly", manual("milk"))
+    item_id = uuid.UUID(created["items"][0]["id"])
+    assert await db.delete_item(uuid.uuid4(), item_id) is False
+    assert await db.delete_item(uid, uuid.uuid4()) is False
+    assert await db.get_list(uid, uuid.UUID(created["id"])) is not None
+
+
 async def test_delete_list_returns_false_when_missing_or_foreign(pool, uid):
     created = await db.create_list(uid, "Weekly", [])
     list_id = uuid.UUID(created["id"])

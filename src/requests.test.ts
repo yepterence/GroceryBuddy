@@ -8,6 +8,7 @@ import {
   fetchRepurchaseSuggestions,
   getUserId,
   recordOutcome,
+  removeItem,
   removeList,
   setItemChecked,
 } from "./requests";
@@ -150,6 +151,17 @@ describe("requests", () => {
         status: 404,
         message: "list not found",
       });
+    });
+  });
+
+  describe("removeItem", () => {
+    it("DELETEs the item", async () => {
+      fetchMock.mockResolvedValue(jsonResponse({ status: "success" }));
+
+      await removeItem("item-1");
+
+      expect(call().method).toBe("DELETE");
+      expect(call().url).toBe(`/api/items/item-1?user_id=${getUserId()}`);
     });
   });
 

@@ -124,6 +124,13 @@ export const fetchList = async (listId: string): Promise<GroceryList> => {
   return toList(data.list);
 };
 
+/** DELETE /items/<id>. The Addition history is left in place. */
+export const removeItem = async (itemId: string): Promise<void> => {
+  await request<unknown>(`/items/${encodeURIComponent(itemId)}?${userQuery()}`, {
+    method: "DELETE",
+  });
+};
+
 /** DELETE /lists/<id>. */
 export const removeList = async (listId: string): Promise<void> => {
   await request<unknown>(`/lists/${encodeURIComponent(listId)}?${userQuery()}`, {
