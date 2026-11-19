@@ -44,7 +44,7 @@ consumed*, plus the consumption trends derived from them.
 
 | ID | Requirement | Goal |
 |----|-------------|------|
-| F1 | Create/edit/delete a **needed-items list**; check items off | G1 |
+| F1 | Create/edit/delete a **needed-items list**; check items off. Creating a list requires a non-blank title and may start with zero items; the Shopper adds items later on the saved list | G1 |
 | F2 | Multiple named lists per user (reuses existing `GroceryList` shape). Each is an **Active list** until the Shopper archives it | G1 |
 | F2a | Archive a list. An **Archived list** stays readable and keeps its items and Additions. Archiving writes no Inclusion. Items on an Archived list are not Open | G1 |
 | F3 | Record a **list-inclusion event** every time an item is added to a list (timestamp) | G2 |

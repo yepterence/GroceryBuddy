@@ -188,6 +188,18 @@ async def update_item(request, item_id):
     return json({"status": "success", "item": item})
 
 
+@bp.delete("/items/<item_id:str>")
+async def remove_item(request, item_id):
+    """Drop one line. Does not undo the Addition recorded when it was added."""
+    user_id = _parse_uuid(request.args.get("user_id"))
+    item_uuid = _parse_uuid(item_id)
+    if user_id is None or item_uuid is None:
+        return _error("valid user_id and item id (uuid) are required")
+    if not await db.delete_item(user_id, item_uuid):
+        return _error("item not found", 404)
+    return json({"status": "success"})
+
+
 @bp.get("/recommendations/repurchase")
 async def repurchase_suggestions(request):
     """Due re-purchase Suggestions, computed on read (PRD 02 §4a)."""

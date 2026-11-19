@@ -1,14 +1,11 @@
-import Basket from "../assets/basket.svg";
-import { SearchBar } from "./SearchBar";
-
 const Header = () => {
-  const logo = <img src={Basket} alt="logo" />;
   return (
-    <div className="header">
-      {logo}
-      <h3>GroceryBuddy</h3>
-      <SearchBar />
-    </div>
+    <header className="header">
+      <div className="header-inner">
+        <h1>Grocery Buddy</h1>
+        <p className="header-tagline">Small lists. Easier days.</p>
+      </div>
+    </header>
   );
 };
 

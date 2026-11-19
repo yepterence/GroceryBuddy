@@ -315,6 +315,18 @@ async def record_outcome(user_id, suggestion, action):
     return {"id": str(outcome_id), "recommendation_id": str(recommendation_id), "action": action}
 
 
+async def delete_item(user_id, item_id):
+    """Remove one line from a list. The Addition in list_inclusion stays.
+
+    Returns True if a row was deleted.
+    """
+    async with _get_pool().acquire() as conn:
+        result = await conn.execute(
+            "DELETE FROM needed_item WHERE id = $1 AND user_id = $2", item_id, user_id
+        )
+    return result.endswith(" 1")
+
+
 async def delete_list(user_id, list_id):
     """Returns True if a list was deleted."""
     async with _get_pool().acquire() as conn:

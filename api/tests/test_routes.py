@@ -307,6 +307,35 @@ async def test_delete_list_cannot_delete_other_users_list(client, user_id):
     assert resp.status == 200
 
 
+async def test_delete_item_removes_one_line(client, user_id):
+    saved = await create_list(client, user_id, items=["milk", "eggs"])
+    milk_id = saved["items"][0]["id"]
+    _, resp = await client.delete(f"/items/{milk_id}", params={"user_id": user_id})
+    assert resp.status == 200
+    assert resp.json["status"] == "success"
+
+    _, resp = await client.get(f"/lists/{saved['id']}", params={"user_id": user_id})
+    assert [i["name"] for i in resp.json["list"]["items"]] == ["eggs"]
+
+
+async def test_delete_item_missing_or_other_users_returns_404(client, user_id):
+    saved = await create_list(client, user_id, items=["milk"])
+    item_id = saved["items"][0]["id"]
+    _, resp = await client.delete(f"/items/{item_id}", params={"user_id": str(uuid.uuid4())})
+    assert resp.status == 404
+    _, resp = await client.delete(f"/items/{uuid.uuid4()}", params={"user_id": user_id})
+    assert resp.status == 404
+    _, resp = await client.get(f"/lists/{saved['id']}", params={"user_id": user_id})
+    assert [i["name"] for i in resp.json["list"]["items"]] == ["milk"]
+
+
+async def test_delete_item_400_for_invalid_ids(client, user_id):
+    _, resp = await client.delete("/items/not-a-uuid", params={"user_id": user_id})
+    assert resp.status == 400
+    _, resp = await client.delete(f"/items/{uuid.uuid4()}")
+    assert resp.status == 400
+
+
 async def test_delete_list_400_for_invalid_ids(client, user_id):
     _, resp = await client.delete("/lists/not-a-uuid", params={"user_id": user_id})
     assert resp.status == 400

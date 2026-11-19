@@ -5,92 +5,494 @@
 }
 
 html {
-    font-family: sans-serif;
-}
-body {
-    background: #fff;
-}
-.header {
-    margin: auto -10px;
-    padding: 10px 20px;
-    box-shadow: 0 0 2px 0 rgb(114, 114, 114);
-    display: flex;
-    align-self: center;
-    align-items: center;
-    flex-direction: row;
+    font-family: "Nunito", sans-serif;
+    color: #2c2825;
 }
 
-.header h3 {
-    font-size: 1rem;
-    margin-left: 10px;
-    color: #5f6368;
+body {
+    background: #faf6f0;
+}
+
+button,
+input {
+    font-family: inherit;
+}
+
+.header {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 80px;
+    padding-top: 4px;
+    background: #f0f3eb;
+    border-bottom: 1px solid #e1e7dc;
+}
+
+.header::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: #3d7a5f;
+}
+
+.header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    width: min(640px, calc(100% - 40px));
+    margin: 0 auto;
+}
+
+.header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #3d7a5f;
+}
+
+.header-tagline {
+    font-size: 13px;
+    color: #6b6560;
+}
+
+.page {
+    width: min(640px, calc(100% - 40px));
+    margin: 30px auto 48px;
+}
+
+.welcome h2 {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #2c2825;
+}
+
+.welcome p {
+    margin: 4px 0 16px;
+    font-size: 14px;
+    color: #6b6560;
+}
+
+.search {
+    position: relative;
+}
+
+.search img {
+    position: absolute;
+    left: 16px;
+    top: 14px;
+    pointer-events: none;
+}
+
+.search-bar {
+    width: 100%;
+    height: 48px;
+    padding: 0 16px 0 48px;
+    border: 1px solid #e9e3da;
+    border-radius: 14px;
+    background: #fff;
+    color: #2c2825;
+    font-size: 14px;
+    outline: none;
+}
+
+.search-bar::placeholder {
+    color: #6b6560;
+}
+
+.search-bar:focus {
+    border-color: #3d7a5f;
+}
+
+.create-card,
+.list-card {
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 4px 16px rgba(43, 31, 20, 0.05);
+}
+
+.create-card {
+    margin-top: 24px;
+    padding: 20px 24px 24px;
+}
+
+.lists-section {
+    margin-top: 34px;
+}
+
+.section-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.create-card .section-heading {
+    margin-bottom: 14px;
+}
+
+.lists-section .section-heading {
+    margin-bottom: 16px;
+}
+
+.section-heading h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #2c2825;
+}
+
+.lists-section .section-heading h2 {
+    font-size: 24px;
+}
+
+.section-heading p {
+    font-size: 13px;
+    color: #6b6560;
+}
+
+.lists-section .section-heading p {
+    font-size: 12px;
 }
 
 form {
-    position: relative;
-    width: 600px;
-    margin: 32px auto 50px auto;
-    background: #fff;
-    padding: 7px;
-    box-shadow: 0 1px 7px rgb(128, 128, 128);
-    border-radius: 7px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: auto;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
 }
 
-form input {
+form input[type="text"] {
     width: 100%;
-    border: none;
-    padding: 4px 10px;
-    margin-bottom: 20px;
+    height: 44px;
+    margin: 0;
+    padding: 0 14px;
+    border: 1px solid #e9e3da;
+    border-radius: 10px;
     outline: none;
-    font-size: 1rem;
     resize: none;
-    height: 32px;
+    font-size: 14px;
+    color: #2c2825;
+    background: #fff;
 }
-form li .input-list-checkbox {
-    width: 5%;
-    height: 16px;
-    margin-bottom:6px;
+
+form input[name="title"] {
+    background: #faf6f0;
+    font-size: 15px;
+    font-weight: 600;
 }
-form button {
-    background: #6CBDE9;
+
+form input[type="text"]::placeholder {
+    color: #6b6560;
+    font-weight: 400;
 }
-.list-item { 
-    list-style: none;
+
+form input[type="text"]:focus {
+    border-color: #3d7a5f;
 }
-form li.list-item:has(.new-item-input) {
+
+form li.list-item,
+form li.list-item-checked {
     display: flex;
     align-items: center;
-}
-form li .new-item-input {
-    width: auto;
-    flex: 1;
-    margin-bottom: 0;
-}
-.list-item-checked { 
-    text-decoration: line-through; 
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 8px;
     list-style: none;
+    background: #f8faf6;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+form li.list-item:has(.new-item-input) {
+    padding: 0;
+    background: transparent;
+}
+
+form li .new-item-input {
+    width: 100%;
+    flex: 1;
+    margin: 0;
+}
+
+form li.list-item:has(.new-item-input):not(.composer-row) .input-list-checkbox {
+    display: none;
+}
+
+.composer-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.composer-row .suggestion-slot {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+}
+
+.composer-row .suggestion-bubble {
+    min-width: 0;
+}
+
+.composer-row .new-item-input {
+    flex: 1 1 140px;
+    min-width: 8rem;
+}
+
+form li.list-item-checked {
+    color: #6b6560;
+    background: #f5f4f0;
+}
+
+form li.list-item-checked > span {
+    text-decoration: line-through;
+}
+
+input[type="checkbox"] {
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    margin: 0 4px;
+    border: 1.2px solid #a9b5a8;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+}
+
+input[type="checkbox"]:checked {
+    border-color: #3d7a5f;
+    background: #3d7a5f url("../assets/check.svg") center / 16px 16px no-repeat;
+}
+
+input[type="checkbox"]:disabled {
+    cursor: default;
+}
+
+.list-item {
+    list-style: none;
+}
+
+.list-item-checked > span {
+    color: #6b6560;
+    text-decoration: line-through;
+}
+
+form > button,
+.button-add,
+.button-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+form > button {
+    align-self: flex-end;
+    height: 44px;
+    padding: 0 18px;
+    border-radius: 12px;
+    background: #3d7a5f;
+    color: #fff;
+    font-size: 15px;
+}
+
+form > button::before,
+.button-add::before {
+    content: "";
+    width: 18px;
+    height: 18px;
+    background-color: currentColor;
+    mask-image: url("../assets/add.svg");
+    mask-repeat: no-repeat;
+    mask-position: center;
+    mask-size: 18px 18px;
+}
+
+form > button:hover:not(:disabled) {
+    background: #32684f;
+}
+
+form > button:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.lists {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.list-card {
+    padding: 16px 12px 8px;
+}
+
+.list-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 12px 8px;
+}
+
+.list-card h3 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #2c2825;
+}
+
+.list-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.button-add,
+.button-delete {
+    height: 40px;
+    padding: 0 12px;
+    border-radius: 10px;
+    font-size: 13px;
+}
+
+.button-add {
+    background: #edf3ec;
+    color: #3d7a5f;
+}
+
+.button-add:hover,
+.button-add.is-open {
+    background: #3d7a5f;
+    color: #fff;
+}
+
+.button-delete {
+    background: #faf0e7;
+    color: #2c2825;
+    font-weight: 600;
+}
+
+.button-delete:hover {
+    background: #f3e0d0;
+}
+
+.list-card ul {
+    list-style: none;
+}
+
+.list-card li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    margin: 0 4px;
+    padding: 0 8px;
+    border-bottom: 1px solid #ece7df;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.list-card li:last-child {
+    border-bottom: none;
+}
+
+.list-card li.suggestion-slot {
+    display: block;
+    min-height: 0;
+    margin: 4px 12px 8px;
+    padding: 0;
+    border: none;
+    font-weight: 400;
+}
+
+.list-card li:has(.new-item-input) {
+    margin: 8px 12px;
+    border: 1px solid #e9e3da;
+    border-radius: 10px;
+}
+
+.list-card li:has(.new-item-input):not(.composer-row) .input-list-checkbox {
+    display: none;
+}
+
+.list-card li.composer-row {
+    border: none;
+    margin: 8px 12px;
+    padding: 0;
+}
+
+.icon-dismiss {
+    margin-left: auto;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    border: none;
+    background: transparent;
+    color: #6b6560;
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.list-card-header .icon-dismiss {
+    margin-left: 0;
+}
+
+.icon-dismiss:hover {
+    color: #2c2825;
+}
+
+.list-card .new-item-input {
+    height: 36px;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 400;
+    color: #2c2825;
+    outline: none;
 }
 
 .suggestion-slot {
     list-style: none;
-    margin-bottom: 8px;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
+    min-height: 0;
+    font-weight: 400;
 }
 
 .suggestion-bubble {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 10px;
-    border: 1px dashed #6CBDE9;
-    border-radius: 16px;
-    background: #f1f9fd;
+    padding: 8px 10px;
+    border: 1px dashed #3d7a5f;
+    border-radius: 14px;
+    background: #edf3ec;
     touch-action: pan-y;
 }
 
-form .suggestion-bubble button {
+form .suggestion-bubble button,
+.suggestion-bubble button {
     background: transparent;
     border: none;
     cursor: pointer;
+    color: inherit;
 }
 
 .suggestion-accept {
@@ -102,24 +504,28 @@ form .suggestion-bubble button {
 }
 
 .suggestion-name {
-    font-weight: bold;
+    font-weight: 700;
+    color: #2c2825;
 }
 
 .suggestion-reason {
-    font-size: 0.85rem;
-    color: #5f6368;
+    font-size: 13px;
+    color: #6b6560;
 }
 
 .suggestion-dismiss {
     font-size: 1.2rem;
     line-height: 1;
+    color: #6b6560;
 }
 
-form .suggestion-chip {
+form .suggestion-chip,
+.suggestion-chip {
     padding: 2px 10px;
-    border: 1px dashed #6CBDE9;
+    border: 1px dashed #3d7a5f;
     border-radius: 12px;
-    background: #f1f9fd;
+    background: #edf3ec;
+    color: #3d7a5f;
     font-size: 0.85rem;
     cursor: pointer;
 }
@@ -129,13 +535,12 @@ form .suggestion-chip {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    width: 600px;
-    max-width: 100%;
-    margin: 16px auto 0 auto;
+    width: 100%;
+    margin: 0 0 12px;
     padding: 10px 14px;
     border: 1px solid;
-    border-radius: 7px;
-    font-size: 0.95rem;
+    border-radius: 10px;
+    font-size: 14px;
 }
 
 .banner-error {
@@ -151,9 +556,9 @@ form .suggestion-chip {
 }
 
 .banner-info {
-    background: #e8f4fd;
-    border-color: #b6dcf5;
-    color: #0b4a73;
+    background: #edf3ec;
+    border-color: #c5d7c8;
+    color: #2c2825;
 }
 
 .banner-success {
@@ -169,4 +574,10 @@ form .suggestion-chip {
     font-size: 1.2rem;
     line-height: 1;
     cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible {
+    outline: 2px solid #3d7a5f;
+    outline-offset: 2px;
 }

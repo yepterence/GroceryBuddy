@@ -1,4 +1,4 @@
-import { ChangeEvent, Fragment, useEffect, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { GroceryLists, GroceryList, Item, Suggestion } from "../types";
 import { useListStore } from "../store/applicationStore";
@@ -7,6 +7,7 @@ import {
   fetchLists,
   fetchRepurchaseSuggestions,
   recordOutcome,
+  removeItem,
   removeList,
   setItemChecked,
 } from "../requests";
@@ -99,9 +100,10 @@ const SavedListAdder = ({
   };
 
   return (
-    <>
+    <li className={shown ? "list-item composer-row" : "list-item"}>
       {shown && (
         <SuggestionBubble
+          inline
           suggestion={shown}
           collapsed={collapsed}
           onAccept={() => accept(shown)}
@@ -112,32 +114,30 @@ const SavedListAdder = ({
           onExpand={expand}
         />
       )}
-      <li className="list-item">
-        <input
-          type="checkbox"
-          checked={false}
-          disabled
-          className="input-list-checkbox"
-          aria-hidden="true"
-          tabIndex={-1}
-        />
-        <input
-          type="text"
-          className="new-item-input"
-          placeholder="New Item"
-          aria-label={`New item on ${list.title}`}
-          value={newItem}
-          onChange={handleChange}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              commitTyped();
-            }
-          }}
-          ref={inputRef}
-        />
-      </li>
-    </>
+      <input
+        type="checkbox"
+        checked={false}
+        disabled
+        className="input-list-checkbox"
+        aria-hidden="true"
+        tabIndex={-1}
+      />
+      <input
+        type="text"
+        className="new-item-input"
+        placeholder="New Item"
+        aria-label={`New item on ${list.title}`}
+        value={newItem}
+        onChange={handleChange}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commitTyped();
+          }
+        }}
+        ref={inputRef}
+      />
+    </li>
   );
 };
 
@@ -145,6 +145,7 @@ const GroceryDashboard = ({ lists }: GroceryLists) => {
   const setGroceryLists = useListStore((state) => state.setGroceryLists);
   const toggleItemChecked = useListStore((state) => state.toggleItemChecked);
   const deleteList = useListStore((state) => state.deleteList);
+  const removeItemFromList = useListStore((state) => state.removeItem);
   // Errors from check/delete actions.
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -198,67 +199,94 @@ const GroceryDashboard = ({ lists }: GroceryLists) => {
     }
   };
 
+  const handleRemoveItem = async (listId: string, item: Item) => {
+    setActionError(null);
+    try {
+      await removeItem(item.id);
+      removeItemFromList(listId, item.id);
+    } catch (err) {
+      setActionError(messageFrom(err, "Could not remove the item."));
+    }
+  };
+
   return (
-    <>
-      <h2>Grocery List Dashboard</h2>
+    <section className="lists-section">
       <Banner
         type="error"
         message={actionError || loadErrorMessage}
         onDismiss={dismissError}
       />
       <Banner type="success" message={notice} onDismiss={() => setNotice(null)} />
+      <div className="section-heading">
+        <h2>Your lists</h2>
+        <p>A little planning. One easy trip.</p>
+      </div>
       <div className="lists">
         {lists &&
           lists.map((newList: GroceryList) => (
-            <Fragment key={newList.id}>
-              <h3>{newList.title}</h3>
-              <button
-                type="button"
-                aria-label={`Add item to ${newList.title}`}
-                aria-expanded={addingListId === newList.id}
-                onClick={() =>
-                  setAddingListId((current) =>
-                    current === newList.id ? null : newList.id,
-                  )
-                }
-              >
-                Add item
-              </button>
-              <button
-                type="button"
-                aria-label={`Delete ${newList.title}`}
-                onClick={() => handleDelete(newList.id)}
-              >
-                Delete
-              </button>
-              <div>
-                <ul>
-                  {newList.contents.map((item: Item) => (
-                    <li key={item.id}>
-                      <input
-                        type="checkbox"
-                        checked={item.checked}
-                        className={
-                          item.checked ? "list-item-checked" : "list-item"
-                        }
-                        onChange={() => handleToggle(newList.id, item)}
-                      />
-                      {item.name}
-                    </li>
-                  ))}
-                  {addingListId === newList.id && (
-                    <SavedListAdder
-                      list={newList}
-                      onError={setActionError}
-                      onAdded={setNotice}
+            <article className="list-card" key={newList.id}>
+              <header className="list-card-header">
+                <h3>{newList.title}</h3>
+                <div className="list-card-actions">
+                  <button
+                    type="button"
+                    className={
+                      addingListId === newList.id ? "button-add is-open" : "button-add"
+                    }
+                    aria-label={`Add item to ${newList.title}`}
+                    aria-expanded={addingListId === newList.id}
+                    onClick={() =>
+                      setAddingListId((current) =>
+                        current === newList.id ? null : newList.id,
+                      )
+                    }
+                  >
+                    Add item
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-dismiss"
+                    aria-label={`Delete ${newList.title}`}
+                    onClick={() => handleDelete(newList.id)}
+                  >
+                    ×
+                  </button>
+                </div>
+              </header>
+              <ul>
+                {newList.contents.map((item: Item) => (
+                  <li
+                    key={item.id}
+                    className={item.checked ? "list-item list-item-checked" : "list-item"}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={item.checked}
+                      onChange={() => handleToggle(newList.id, item)}
                     />
-                  )}
-                </ul>
-              </div>
-            </Fragment>
+                    <span>{item.name}</span>
+                    <button
+                      type="button"
+                      className="icon-dismiss"
+                      aria-label={`Remove ${item.name}`}
+                      onClick={() => handleRemoveItem(newList.id, item)}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+                {addingListId === newList.id && (
+                  <SavedListAdder
+                    list={newList}
+                    onError={setActionError}
+                    onAdded={setNotice}
+                  />
+                )}
+              </ul>
+            </article>
           ))}
       </div>
-    </>
+    </section>
   );
 };
 
