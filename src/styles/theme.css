@@ -282,6 +282,19 @@ input[type="checkbox"]:disabled {
     list-style: none;
 }
 
+.list-card-header h3 mark {
+    background-color: #fff3b0;
+    border-radius: 4px;
+    color: inherit;
+    padding: 0 2px;
+}
+
+.list-item-match > span {
+    background-color: #fff3b0;
+    border-radius: 4px;
+    padding: 0 4px;
+}
+
 .list-item-checked > span {
     color: #6b6560;
     text-decoration: line-through;

@@ -1,7 +1,7 @@
-import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { GroceryLists, GroceryList, Item, Suggestion } from "../types";
-import { useListStore } from "../store/applicationStore";
+import { useListStore, useSearchQueryStore } from "../store/applicationStore";
 import {
   addItem,
   fetchLists,
@@ -15,6 +15,24 @@ import { LISTS_QUERY_KEY } from "../queryClient";
 import { useSuggestionSlot } from "../useSuggestionSlot";
 import Banner from "./Banner";
 import SuggestionBubble from "./Suggestion";
+
+/** Wraps each case-insensitive occurrence of `term` in `text` with a <mark>. */
+const highlightTerm = (text: string, term: string) => {
+  if (!term) return text;
+  const lowerText = text.toLowerCase();
+  const parts: ReactNode[] = [];
+  let cursor = 0;
+  let at = lowerText.indexOf(term);
+  while (at !== -1) {
+    if (at > cursor) parts.push(text.slice(cursor, at));
+    parts.push(<mark key={at}>{text.slice(at, at + term.length)}</mark>);
+    cursor = at + term.length;
+    at = lowerText.indexOf(term, cursor);
+  }
+  if (cursor === 0) return text;
+  if (cursor < text.length) parts.push(text.slice(cursor));
+  return parts;
+};
 
 const messageFrom = (err: unknown, fallback: string) =>
   err instanceof Error ? err.message : fallback;
@@ -145,6 +163,7 @@ const GroceryDashboard = ({ lists }: GroceryLists) => {
   const setGroceryLists = useListStore((state) => state.setGroceryLists);
   const toggleItemChecked = useListStore((state) => state.toggleItemChecked);
   const deleteList = useListStore((state) => state.deleteList);
+  const searchTerm = useSearchQueryStore((state) => state.searchTerm);
   const removeItemFromList = useListStore((state) => state.removeItem);
   // Errors from check/delete actions.
   const [actionError, setActionError] = useState<string | null>(null);
@@ -209,6 +228,20 @@ const GroceryDashboard = ({ lists }: GroceryLists) => {
     }
   };
 
+  // A filtered copy: the store keeps every list, so clearing the search restores them.
+  const term = searchTerm.trim().toLowerCase();
+  const matchesTerm = (text: string) => text.toLowerCase().includes(term);
+  const searchFilteredList = !lists
+    ? lists
+    : term
+      ? lists.filter(
+          (list) =>
+            matchesTerm(list.title) ||
+            list.contents.some((item) => matchesTerm(item.name)),
+        )
+      : lists;
+  const noMatches = Boolean(term) && searchFilteredList?.length === 0;
+
   return (
     <section className="lists-section">
       <Banner
@@ -222,11 +255,12 @@ const GroceryDashboard = ({ lists }: GroceryLists) => {
         <p>A little planning. One easy trip.</p>
       </div>
       <div className="lists">
-        {lists &&
-          lists.map((newList: GroceryList) => (
+        {noMatches && <Banner type="info" message="No match found" />}
+        {searchFilteredList &&
+          searchFilteredList.map((newList: GroceryList) => (
             <article className="list-card" key={newList.id}>
               <header className="list-card-header">
-                <h3>{newList.title}</h3>
+                <h3 aria-label="List-Title">{highlightTerm(newList.title, term)}</h3>
                 <div className="list-card-actions">
                   <button
                     type="button"
@@ -257,7 +291,12 @@ const GroceryDashboard = ({ lists }: GroceryLists) => {
                 {newList.contents.map((item: Item) => (
                   <li
                     key={item.id}
-                    className={item.checked ? "list-item list-item-checked" : "list-item"}
+                    className={[
+                      item.checked ? "list-item list-item-checked" : "list-item",
+                      term && matchesTerm(item.name) ? "list-item-match" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                   >
                     <input
                       type="checkbox"
