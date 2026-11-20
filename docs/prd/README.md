@@ -1,9 +1,11 @@
 # PRD Index — AI-Augmented Grocery & Nutrition Platform
 
 The original single PRD has been split into feature-scoped PRDs so each is
-independently reviewable and shippable. They are ordered by dependency: build top to
-bottom. The key sequencing rule is **build one concrete recommender before generalizing
-into a framework** (concrete-then-extract).
+independently reviewable and shippable. The table and diagram below are dependency
+order. Current build order is in **Build sequence rationale** (revised 2026-11-19):
+finish PRD 02, then authentication, an iOS test path, and a hosted web URL, then weigh
+PRD 03 and PRD 04. The key sequencing rule for the framework remains **build one
+concrete recommender before generalizing into a framework** (concrete-then-extract).
 
 | # | PRD | Goals | Depends on | Status |
 |---|-----|-------|-----------|--------|
@@ -48,6 +50,9 @@ Not sequenced with 01→04. Implement when infra time is available.
                     owns signal schemas + ranking)
 ```
 
+This diagram is dependency order, not the current build order. PRD 03 and PRD 04 still
+depend on the PRDs above them. They are weighed only after the iOS and hosted-web phase.
+
 ## Build sequence rationale
 
 1. **01 first** — everything reads from the tracking data model; it defines the first
@@ -57,13 +62,22 @@ Not sequenced with 01→04. Implement when infra time is available.
    one (no nutrition, no checkout integration, no AI), so re-purchase is **vital, not
    optional**: it's the most directly available unit of value and de-risks the
    "recommendation" idea with a real, narrow example.
-3. **03 in parallel-ish** — the AI photo→nutrition loop (the headline augmentation).
-   Mobile capture UX is folded in here because that is where "mobile" actually earns its
-   keep (camera, latency, offline). Adds the `nutrition` signal.
-4. **04 last** — generalize the concrete recommender (02) into a plugin framework, wrap
-   the existing flyer scraper as M1, add the nutrition recipe recommender (M3). This PRD
-   owns the two hardest problems: **signal-schema contracts** and **cross-module score
-   normalization**.
+3. **Auth, then iOS and a hosted web URL** — once PRD 02 is done. Authentication
+   ([PRD 01 §10](./01-core-item-tracking.md#10-production-gate)) comes first: a session
+   proves the caller owns `user_id`. Then put the existing list app on iOS and define how
+   that build is tested, and put the web app on a public URL. The iOS shell (Safari, a
+   Capacitor wrap, or React Native) and the web host are still undecided. This phase is
+   the list app. PRD 03's camera capture is a later decision.
+4. **Then weigh PRD 03 and PRD 04.** PRD 03 is the photo→nutrition loop and adds the
+   `nutrition` signal. Its camera capture is separate from the iOS shell in step 3.
+   PRD 04 generalizes the concrete recommender (02) into a plugin framework, wraps the
+   existing flyer scraper as M1, and adds the nutrition recipe recommender (M3). It still
+   depends on 01, 02, and 03, and it still owns **signal-schema contracts** and
+   **cross-module score normalization**. Which of the two to build, and in what order, is
+   decided after step 3.
+
+If PRD 03 or PRD 04 is chosen later, it ships as an update to the iOS app from step 3.
+App Store and TestFlight update steps wait until the shell is chosen.
 
 ## Out of these PRDs (later / exploratory)
 
@@ -111,11 +125,12 @@ stored, so it needs a data migration and an amendment to ADR 0001.
 | 01 Core item tracking | **Build** | Small foundation; needed-items + **list-inclusion history** |
 | 02 Re-purchase (M2) | **Build (vital)** | Driven by **list-inclusion frequency** the core app already produces; no AI/nutrition dependency |
 | M1 flyer/price (existing scraper) | **Deferred** | Needs label-based (or AI-retrieved) matching first; flyer data cached per postal code when built ([design §4 M1](../modular-recommendations-design.md)) |
-| 04 Framework contract + registry | **Design-only (v1)** | One recommender can't prove a plugin contract; extract once a second real recommender exists |
-| 03 AI capture + nutrition | **Stretch (thin)** | Only after the v1 loop ships. Vision LLM (no training); nutrition via Open Food Facts / USDA |
+| 04 Framework contract + registry | **Design-only (v1)** | Weighed with PRD 03 after the iOS and hosted-web phase. If chosen, ships as an update to that iOS app. One recommender can't prove a plugin contract; extract once a second real recommender exists |
+| 03 AI capture + nutrition | **Stretch (thin)** | Weighed after the iOS and hosted-web phase. If chosen, ships as an update to that iOS app. Vision LLM (no training); nutrition via Open Food Facts / USDA |
 | M3 recipe/item by nutrient gap | **Stretch (thin)** | Depends on 03 |
 | M4 / M5 / M6 | **Design-only** | Documented as "designed, not built" + roadmap |
-| Mobile version | **Final step, after auth** | Required. Approach is an open decision (PWA, Capacitor-wrapped web app, or React Native); revisit before building the frontend component structure further |
+| Mobile version | **Next after PRD 02; auth first** | Required. On-device testing is part of this phase. Shell (Safari, a Capacitor wrap, or React Native) is still undecided |
+| Hosted web URL | **Same phase as the iOS version** | Required. A public URL for the web app. The host is still undecided |
 | Data-moat machinery, custom model | **Out of scope** | Company concerns; in a portfolio they read as unfinished scope |
 
 **Why design-only is fine (and good):** demonstrating an extensible design + a credible
@@ -127,3 +142,5 @@ modules. The PRDs themselves are part of the deliverable.
 PRD 01 segregates lists with an anonymous `user.id` and stores no email, password, or session. That id is a tenant key: whoever can send it can read and write those rows.
 
 **Blocker:** authentication (who is calling) and authorization (a caller may only touch their own `user_id`) must exist before this app is dockerized, treated as production, or shipped as the mobile version ([ADR 0002](../adr/0002-anonymous-device-bound-shopper.md)). The `user_id` foreign keys stay. Production replaces "the client sends an id" with "a session proves this caller owns this id." See [PRD 01 §10](./01-core-item-tracking.md#10-production-gate).
+
+As of 2026-11-19 this gate moves up with the iOS phase. That phase is next after PRD 02, and it includes a public URL for the web app. The iOS shell and the web host are still undecided.

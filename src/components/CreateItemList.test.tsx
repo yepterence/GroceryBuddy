@@ -253,6 +253,21 @@ describe("CreateItemList suggestions", () => {
     );
   });
 
+  it("lays the suggestion bubble after the new-item field on the same row", async () => {
+    offer(oatMilk);
+    const user = userEvent.setup();
+    render(<CreateItemList />);
+    await user.type(screen.getByPlaceholderText("Title"), "Weekly");
+
+    const input = screen.getByPlaceholderText("New Item");
+    const row = input.closest("li");
+    expect(row).toHaveClass("composer-row");
+    const suggestion = await screen.findByRole("group", { name: "Suggestion" });
+    expect(input.compareDocumentPosition(suggestion)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
   it("shows Suggestions on an event list once grocery items are on it", async () => {
     vi.mocked(fetchRepurchaseSuggestions).mockResolvedValue({
       suggestions: [oatMilk],

@@ -11,7 +11,9 @@ This is the headline AI augmentation: turn **a food photo into structured nutrit
 and capture the user's corrections as training-grade data. It also owns the **mobile
 capture experience**, because the camera is where "mobile" actually earns its keep
 (latency, offline, on-device potential) — so rather than a vague standalone "make it
-mobile" PRD, mobile concerns live here, scoped to capture.
+mobile" PRD, mobile concerns live here, scoped to capture. This PRD still owns camera
+capture when it is built. Putting today's list app on iOS, and defining how that build is
+tested, is a separate phase, sequenced after PRD 02 and before this PRD is prioritized.
 
 The pipeline: `photo -> recognition -> user correction -> portion -> nutrition -> log`.
 

@@ -4,7 +4,7 @@ Your grocery list, on your side. Grocery Buddy checks local flyers for sales on 
 
 Where it’s headed: snap a photo of what you ate to log its nutrition, suggest recipes that fill nutrient gaps, and recommend re-purchases based on what you buy regularly. The goal is to link nutrition to local prices, which nutrition apps and flyer apps each stop short of. See the [product specs](docs/prd/README.md).
 
-Status: the list API, flyer price lookup and Postgres schema are built, and a test suite covers the API against a real Postgres. Connecting the frontend to the API and building the recommenders come next. See [`docs/progress.md`](docs/progress.md) for details.
+Status: the list API, flyer price lookup and Postgres schema are built, and a test suite covers the API against a real Postgres. PRD 02 (re-purchase suggestions) is in progress. After it: authentication, testing the list app on iOS, and a hosted web URL. PRD 03 and PRD 04 are weighed after that. See [`docs/progress.md`](docs/progress.md) for details.
 
 ## Local development
 

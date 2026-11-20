@@ -97,7 +97,7 @@ PoC rule (word lists and thresholds kept in one place so they can be tuned):
 
 - **Title signal:** a grocery word in the title (`grocery`, `groceries`, `weekly`, `shop`,
   `market`, `food`, `costco`) shows re-purchase Suggestions. An occasion word (`party`,
-  `bbq`, `birthday`, `potluck`, `christmas`) does not hide them, and it does not by itself
+  `bbq`, `birthday`, `potluck`, `christmas`, `thanksgiving`) does not hide them, and it does not by itself
   show the weekly re-purchase list. It selects the seasonal companions below. Words match as
   whole words, ignoring capitalization, so `workshop` is not `shop`. The word lists are
   English. A title in another language, or a title with no spaces between words, matches
@@ -116,11 +116,10 @@ PoC rule (word lists and thresholds kept in one place so they can be tuned):
   unfamiliar, and an Item in any language counts once they have added it before.
 - **Seasonal companions:** while an occasion list is being built, pair a grocery Item on it
   with Items commonly bought at that time of year. Those companions come from one shared
-  list, grouped by occasion word (a Christmas list includes turkey, cranberry sauce,
-  stuffing, potatoes, and gravy; a barbecue list includes buns, burgers, and the usual
-  condiments). The list is English and lives with the other word lists so it can be tuned.
-  Weekly re-purchase Suggestions still wait for grocery intent. The occasion title alone
-  does not dump the weekly staples onto the list.
+  list, grouped by occasion word, in
+  [`../../src/data/seasonal-events.json`](../../src/data/seasonal-events.json). The list is
+  English. The slot shows the next companion that is not already on the list. Weekly
+  staples, such as bread, are not offered on that list.
 
 **Computed where.** The list opens with one `GET /recommendations/repurchase?user_id=`, which
 returns the due suggestions (dismissals already applied) and the Shopper's known Item names.
@@ -163,7 +162,7 @@ with `source = suggestion`), records the accepted Outcome right away, and a bann
 | F6 | (Optional) blend in `purchase_history` when checkout data is available |
 | F7 | (Later, after flyer matching, auth and mobile) When a dismissed item appears in this week's flyer, offer it again with the price as the reason, optionally as a notification |
 | F8 | (Later) Re-rank suggestions on the server as the draft list changes, instead of the PoC's single fetch when the list opens |
-| F9 | For an occasion title, suggest Items from the seasonal companion list (§4a) that pair with the grocery Items already on the list. Showing those companions in the Suggestion slot is not built yet |
+| F9 | For an occasion title, suggest the next Item from the seasonal companion list (§4a) that is not already on the list. Weekly re-purchase Suggestions are not shown on that list |
 
 ## 6. Data Model
 

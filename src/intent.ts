@@ -1,3 +1,4 @@
+import seasonalEventsJson from "./data/seasonal-events.json";
 import { normalizeItemName } from "./items";
 import { Item } from "./types";
 
@@ -16,22 +17,21 @@ export const GROCERY_WORDS = [
   "costco",
 ];
 
-export const EVENT_WORDS = ["party", "bbq", "birthday", "potluck", "christmas"];
+/**
+ * Occasion names, in suggestion order. Key order in seasonal-events.json is that
+ * order, and "party" is last, so "birthday party" starts with cake.
+ */
+export const EVENT_WORDS: readonly string[] = Object.keys(seasonalEventsJson);
 
 /** Grocery lines on a mixed list. Whole words, so "oat milk" counts and "buttermilk" does not. */
 export const GROCERY_ITEMS = ["milk", "bread", "eggs", "butter", "rice", "cheese"];
 
 /**
- * Items commonly bought for an occasion. Weekly re-purchase does not use this list.
- * The Suggestion slot does not show it yet (PRD 02 F9).
+ * Items commonly bought for an occasion. An occasion list shows the next one
+ * that is not already on the list, instead of the weekly re-purchase list.
+ * The lists live in src/data/seasonal-events.json.
  */
-export const SEASONAL_ITEMS: Record<string, readonly string[]> = {
-  christmas: ["turkey", "cranberry sauce", "stuffing", "potatoes", "gravy"],
-  bbq: ["buns", "burgers", "ketchup", "mustard", "charcoal"],
-  birthday: ["cake", "candles", "ice cream"],
-  party: ["chips", "soda", "dip", "ice"],
-  potluck: ["chips", "dip", "rolls", "soda"],
-};
+export const SEASONAL_ITEMS: Record<string, readonly string[]> = seasonalEventsJson;
 
 export const MIN_MANUAL_ITEMS = 2;
 export const KNOWN_SHARE = 0.5;
@@ -61,6 +61,15 @@ export const seasonalCompanions = (title: string): string[] => {
     }
   }
   return companions;
+};
+
+/** The next occasion Item that is not already on the list. */
+export const nextSeasonalCompanion = (
+  title: string,
+  itemNames: readonly string[],
+): string | undefined => {
+  const onList = new Set(itemNames.map((name) => normalizeItemName(name)));
+  return seasonalCompanions(title).find((name) => !onList.has(name));
 };
 
 /**

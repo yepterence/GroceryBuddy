@@ -1,6 +1,6 @@
 # Project Progress
 
-Last updated: 2026-11-13. Scope and sequencing live in [`prd/README.md`](./prd/README.md);
+Last updated: 2026-11-19. Scope and sequencing live in [`prd/README.md`](./prd/README.md);
 this file tracks what is actually done. Status key: ✅ done · 🟡 partial / unverified · ⬜ not started.
 
 ## Summary
@@ -14,9 +14,11 @@ this file tracks what is actually done. Status key: ✅ done · 🟡 partial / u
 | Automated tests | ✅ | Run against a real Postgres (`./scripts/test.sh`); last full run 2026-11-10 (131 passed, 1 skipped; frontend 64 passed) |
 | Frontend ↔ API integration | 🟡 | `src/requests.ts` wired into the create form and dashboard; unit-tested with mocked `fetch`, **not yet tried in a browser against the live API** |
 | Re-purchase recommender (PRD 02) | 🟡 | `GET /recommendations/repurchase`, outcome recording, the Suggestion bubble, grocery intent (§4a) and suggestions on saved lists are built (2026-11-13); not tried in a browser |
-| AI capture + nutrition (PRD 03) | ⬜ | |
-| Recommendation framework (PRD 04) | ⬜ | |
-| Auth / production gate | ⬜ | Blocker before production, see below |
+| AI capture + nutrition (PRD 03) | ⬜ | Weighed after the iOS and hosted-web phase. If chosen, ships as an update to that iOS app |
+| Recommendation framework (PRD 04) | ⬜ | Weighed with PRD 03 after that phase. If chosen, ships as an update to that iOS app |
+| Auth / production gate | ⬜ | Next after PRD 02. First work of the iOS phase (PRD 01 §10, [ADR 0002](./adr/0002-anonymous-device-bound-shopper.md)) |
+| iOS list app + on-device testing | ⬜ | After auth. Shell not chosen (Safari, Capacitor, or React Native) |
+| Hosted web URL | ⬜ | Same phase as iOS. Host not chosen |
 | GitHub Actions CI (QoL PRD) | ⬜ | Designed in [`prd/qol-github-actions-ci.md`](./prd/qol-github-actions-ci.md); not started |
 
 ## Done
@@ -64,7 +66,7 @@ this file tracks what is actually done. Status key: ✅ done · 🟡 partial / u
 ## Next up
 
 - [x] Load `.env` in the API (`python-dotenv` in `api/db.py`)
-- [x] Connect the React frontend (`src/`) to the list API (`requests.ts`; create, load, check, delete, add an item to a saved list). Still to do: try it end to end in a browser
+- [x] Connect the React frontend (`src/`) to the list API (`requests.ts`; create, load, check, delete, add an item to a saved list). Browser check against the live API is still open, listed below
 - [x] Update `item_trend` from `list_inclusion` (`api/trends.py` + `db.update_item_trend`: median `cadence_days`, `next_due_at`, 12-hour session deduplication, `inclusion_count >= 2` eligibility, and frequency + recency `calculate_score`; trade-offs documented in `docs/tradeoffs.md`)
 - [x] Implement ADR 0001: normalize item names (lowercase, collapse whitespace) when an addition is recorded; `needed_item.name` keeps what was typed (`api/items.py`, used by `create_list` and `add_item`, 2026-11-05; DB tests passed 2026-11-06). Local data written before this must be reset with `docker compose down -v`
 - [x] Implement ADR 0003: `source` column on `list_inclusion` (`manual` | `suggestion`, NOT NULL, default `manual`). `POST /lists` takes items as names or `{name, source}`; `POST /lists/<id>/items` takes an optional `source`. Accepted suggestions still count toward `item_trend` (2026-11-06). Existing databases need `ALTER TABLE list_inclusion ADD COLUMN source TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'suggestion'))` or a reset
@@ -73,6 +75,15 @@ this file tracks what is actually done. Status key: ✅ done · 🟡 partial / u
 - [x] PRD 02: grocery-intent score (§4a) replacing the 2-Item gate, and suggestions on saved lists (F4) (2026-11-13). `needed_item.source` records manual vs suggestion. Re-running `scripts/create-tables.sh` adds that column to an existing database
 - [x] ~~Decide source and list-purpose signals~~ Source decided in ADR 0003; list purpose replaced by inferred grocery intent (PRD 02 §4a, 2026-11-04)
 - [ ] Decide on duplicate handling for repeated additions (`docs/tradeoffs.md` section 3); per-purpose cadence still open
+- [ ] Try the list app and the re-purchase recommender end to end in a browser against the live API (PRD 02)
+- [ ] After PRD 02: authentication. A session proves the caller owns `user_id` (PRD 01 §10, [ADR 0002](./adr/0002-anonymous-device-bound-shopper.md))
+- [ ] After auth: choose the iOS shell and a way to test the list app on iOS. Shell still open (Safari, a Capacitor wrap, or React Native)
+- [ ] Same phase: a public URL for the web app. Host still undecided
+
+## After iOS
+
+Weigh these once the list app can be tested on iOS. A chosen PRD ships as an update to that app.
+
 - [ ] PRD 03: AI capture and nutrition (thin)
 - [ ] PRD 04: minimal framework contract + registry, wrapping `api/scraper.py` as M1
 
@@ -84,12 +95,12 @@ this file tracks what is actually done. Status key: ✅ done · 🟡 partial / u
 
 Product feel and layout in `src/styles/theme.css` and list components (`GroceryDashboard`, etc.). Can ship incrementally alongside feature work.
 
-- [ ] **List delete as an “×” control** — Replace the text “Delete” button with a compact dismiss control (match `Banner` dismiss styling where it fits). Position it in the list header row (title left, × right) so lists read as cards, not title + stray button.
-- [ ] **Per-item remove** — Add an × on each line next to the checkbox and label; wire to store + API. Today the API has no `DELETE /items/<id>` (only PATCH check and list delete); add backend + `requests.ts` if needed, then style the row as a flex line (checkbox · name · remove).
-- [ ] **Suggestion and new-item on one row** — When a Suggestion bubble is showing, do not put the checkbox and New Item field on the next line. Place them on the same row as the bubble (create form and saved lists). That shared row is what a later animation needs to substitute the Suggestion in as the new list item.
+- [x] **List delete as an “×” control** — Replace the text “Delete” button with a compact dismiss control (match `Banner` dismiss styling where it fits). Position it in the list header row (title left, × right) so lists read as cards, not title + stray button.
+- [x] **Per-item remove** — Add an × on each line next to the checkbox and label; wire to store + API. Today the API has no `DELETE /items/<id>` (only PATCH check and list delete); add backend + `requests.ts` if needed, then style the row as a flex line (checkbox · name · remove).
+- [x] **Suggestion and new-item on one row** — When a Suggestion bubble is showing, do not put the checkbox and New Item field on the next line. Place them on the same row as the bubble (create form and saved lists). That shared row is what a later animation needs to substitute the Suggestion in as the new list item.
 - [ ] **Edit a saved list in the create form** — Choosing a previous list loads it back into the create form with its title and items already filled in, so the Shopper continues in the same place they build a list. Saving updates that list rather than creating a second copy.
 - [ ] **Feature flags for free and paid** — A custom hook turns specific features on or off, so a free tier and a paid tier can ship from the same app. Call sites ask the hook instead of scattering tier checks.
-- [ ] **Visual theme (“Sunday market”)** — Warm, personable grocery-app look (extend/replace the current generic sans + `#6CBDE9` blocks in `theme.css`):
+- [x] **Visual theme (“Sunday market”)** — Warm, personable grocery-app look (extend/replace the current generic sans + `#6CBDE9` blocks in `theme.css`):
   - **Palette:** page `#faf6f0` (cream), surface/cards `#fff` with soft shadow, text `#2c2825`, muted `#6b6560`, primary `#3d7a5f` (sage), accent/hover `#c4713a` (terracotta), error/success aligned with existing banner hues.
   - **Type:** one friendly rounded sans (e.g. **Nunito** or **DM Sans** via Google Fonts) for headings and UI; slightly larger list titles.
   - **Layout:** max-width column (~640px), list blocks as rounded cards with padding; checkbox + item + × on one row with comfortable tap targets on mobile.
@@ -97,7 +108,7 @@ Product feel and layout in `src/styles/theme.css` and list components (`GroceryD
 
 ## Known gaps and risks
 
-- **No authentication.** `user_id` comes from the request, so anyone who knows another user's UUID can read and write their lists. Must be solved before production (PRD 01 §10) and before the mobile version ([ADR 0002](./adr/0002-anonymous-device-bound-shopper.md)). List sharing is also not implemented.
+- **No authentication.** `user_id` comes from the request, so anyone who knows another user's UUID can read and write their lists. This is the first work of the iOS phase, which starts after PRD 02, and it remains the gate before any production deployment or the hosted web URL (PRD 01 §10, [ADR 0002](./adr/0002-anonymous-device-bound-shopper.md)). List sharing is also not implemented.
 - **Concurrent adds can leave `item_trend` stale.** Two overlapping adds of the same item each recompute without seeing the other's uncommitted row; the cache corrects itself on the next addition. A row lock on `(user_id, item_name)` would close it.
 - **Virtualenv name mismatch.** README says `venv/`, but `scripts/test.sh` and `.gitignore` expect `gb-api/`, so following the README creates an un-ignored folder.
 - **No migrations.** `schema.sql` only creates missing objects; it never alters existing tables, except `needed_item.source`, which it adds with `ADD COLUMN IF NOT EXISTS`. Needs a migration tool before further schema changes in a live database.

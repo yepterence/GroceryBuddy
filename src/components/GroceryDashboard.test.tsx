@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import GroceryDashboard from "./GroceryDashboard";
 import CreateItemList from "./CreateItemList";
-import { useListStore } from "../store/applicationStore";
+import { useListStore, useSearchQueryStore } from "../store/applicationStore";
 import {
   addItem,
   createList,
@@ -59,6 +59,7 @@ describe("GroceryDashboard", () => {
     client = makeClient();
     localStorage.clear();
     useListStore.setState({ groceryLists: [] });
+    useSearchQueryStore.setState({ searchTerm: "" });
     vi.mocked(fetchLists).mockResolvedValue([weekly]);
     vi.mocked(removeList).mockResolvedValue(undefined);
     vi.mocked(removeItem).mockResolvedValue(undefined);
@@ -66,6 +67,83 @@ describe("GroceryDashboard", () => {
       id: "item-1",
       name: "Milk",
       checked: true,
+    });
+  });
+
+  describe("searching", () => {
+    const party: GroceryList = {
+      id: "list-2",
+      title: "Party",
+      contents: [{ id: "item-3", name: "Chips", checked: false }],
+    };
+
+    const renderWithTwoLists = async () => {
+      vi.mocked(fetchLists).mockResolvedValue([weekly, party]);
+      render(<Harness />);
+      await screen.findByText("Weekly");
+    };
+
+    const search = (term: string) => useSearchQueryStore.setState({ searchTerm: term });
+
+    it("shows every list when the term is empty", async () => {
+      await renderWithTwoLists();
+
+      expect(screen.getByText("Weekly")).toBeInTheDocument();
+      expect(screen.getByText("Party")).toBeInTheDocument();
+      expect(document.querySelector(".list-item-match")).toBeNull();
+    });
+
+    it("matches a list by title, case-insensitively and trimmed", async () => {
+      await renderWithTwoLists();
+
+      act(() => search("  PARTY "));
+
+      expect(screen.getByRole("heading", { name: "Party" })).toBeInTheDocument();
+      expect(screen.queryByText("Weekly")).not.toBeInTheDocument();
+      expect(document.querySelector(".list-item-match")).toBeNull();
+    });
+
+    it("highlights the term inside the title", async () => {
+      await renderWithTwoLists();
+
+      act(() => search("art"));
+
+      const marks = screen.getByRole("heading", { name: "Party" }).querySelectorAll("mark");
+      expect(marks).toHaveLength(1);
+      expect(marks[0]).toHaveTextContent("art");
+    });
+
+    it("shows the list containing a matching item and highlights that item", async () => {
+      await renderWithTwoLists();
+
+      act(() => search("milk"));
+
+      expect(screen.getByText("Weekly")).toBeInTheDocument();
+      expect(screen.queryByText("Party")).not.toBeInTheDocument();
+      expect(screen.getByText("Eggs")).toBeInTheDocument();
+      expect(screen.getByText("Milk").closest("li")).toHaveClass("list-item-match");
+      expect(screen.getByText("Eggs").closest("li")).not.toHaveClass("list-item-match");
+    });
+
+    it("shows No match found when nothing matches", async () => {
+      await renderWithTwoLists();
+
+      act(() => search("zzz"));
+
+      expect(screen.getByText("No match found")).toBeInTheDocument();
+      expect(screen.queryByText("Weekly")).not.toBeInTheDocument();
+    });
+
+    it("restores every list when the search is cleared, without touching the store", async () => {
+      await renderWithTwoLists();
+
+      act(() => search("zzz"));
+      act(() => search(""));
+
+      expect(screen.getByText("Weekly")).toBeInTheDocument();
+      expect(screen.getByText("Party")).toBeInTheDocument();
+      expect(screen.queryByText("No match found")).not.toBeInTheDocument();
+      expect(useListStore.getState().groceryLists).toHaveLength(2);
     });
   });
 
@@ -340,6 +418,27 @@ describe("GroceryDashboard", () => {
 
       expect(await screen.findByRole("group", { name: "Suggestion" })).toHaveTextContent(
         "oat milk",
+      );
+    });
+
+    it("lays the suggestion bubble after the new-item field on the same row", async () => {
+      vi.mocked(fetchRepurchaseSuggestions).mockResolvedValue({
+        suggestions: [oatMilk],
+        knownItemNames: [],
+      });
+      render(<Harness />);
+      await screen.findByText("Weekly");
+      await openSlot("Weekly");
+      await waitFor(() =>
+        expect(fetchRepurchaseSuggestions).toHaveBeenCalledWith("list-1"),
+      );
+
+      const input = screen.getByRole("textbox", { name: "New item on Weekly" });
+      const row = input.closest("li");
+      expect(row).toHaveClass("composer-row");
+      const suggestion = await screen.findByRole("group", { name: "Suggestion" });
+      expect(input.compareDocumentPosition(suggestion)).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
       );
     });
   });

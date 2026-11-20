@@ -73,3 +73,18 @@ const store: StateCreator<ListStore> = (set) => ({
 export const useListStore = create<ListStore>()(
   persist(store, { name: "grocery-list" }),
 );
+
+interface SearchQueryStore {
+  searchTerm: string;
+  setSearchTerm: (searchTerm: string) => void;
+}
+
+// Not persisted: a reload should never open on a filtered dashboard.
+const searchQuery: StateCreator<SearchQueryStore> = (set) => ({
+  searchTerm: "",
+  setSearchTerm: (searchTerm) => {
+    set({ searchTerm });
+  },
+});
+
+export const useSearchQueryStore = create<SearchQueryStore>()(searchQuery);
