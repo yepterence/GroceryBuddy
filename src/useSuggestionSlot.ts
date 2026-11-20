@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { hasGroceryIntent } from "./intent";
+import { hasGroceryIntent, seasonalCompanions } from "./intent";
 import { normalizeItemName } from "./items";
 import { Item, Suggestion } from "./types";
 
@@ -29,9 +29,26 @@ export const useSuggestionSlot = ({
   const [collapsedFor, setCollapsedFor] = useState<string | null>(null);
 
   const show = hasGroceryIntent({ title, items, knownItemNames });
+  const companions = seasonalCompanions(title);
+  // An occasion list suggests those companions, not the weekly staples.
+  const queue: Suggestion[] =
+    companions.length > 0
+      ? companions.map((name) => ({
+          type: "repurchase",
+          payload: {
+            item_name: name,
+            inclusion_count: 0,
+            last_included_at: "",
+            cadence_days: null,
+            next_due_at: null,
+          },
+          reason: "Commonly bought for this occasion",
+          score: 1,
+        }))
+      : suggestions;
   const onList = new Set(items.map((item) => normalizeItemName(item.name)));
   const next = show
-    ? suggestions.find(
+    ? queue.find(
         (suggestion) =>
           !onList.has(suggestion.payload.item_name) &&
           !dismissed.has(suggestion.payload.item_name),

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { hasGroceryIntent, seasonalCompanions } from "./intent";
+import seasonalEvents from "./data/seasonal-events.json";
+import { hasGroceryIntent, nextSeasonalCompanion, seasonalCompanions } from "./intent";
 import { ItemSource } from "./types";
 
 const item = (name: string, source: ItemSource = "manual") => ({ name, source });
@@ -9,6 +10,23 @@ const intent = (
   items: { name: string; source?: ItemSource }[],
   knownItemNames: string[],
 ) => hasGroceryIntent({ title, items, knownItemNames });
+
+describe("seasonal events will refer to maintained list to produce recommendations", () => {
+  it("names each occasion with one word, 1 to 10 items, and party last", () => {
+    const events = Object.keys(seasonalEvents);
+    expect(new Set(events).size).toBe(events.length);
+    expect(events[events.length - 1]).toBe("party");
+    for (const [event, items] of Object.entries(seasonalEvents)) {
+      expect(event).toMatch(/^[a-z0-9]+$/);
+      expect(items.length).toBeGreaterThanOrEqual(1);
+      expect(items.length).toBeLessThanOrEqual(10);
+      for (const name of items) {
+        expect(name.length).toBeGreaterThan(0);
+        expect(name).toBe(name.trim());
+      }
+    }
+  });
+});
 
 describe("hasGroceryIntent", () => {
   describe("title", () => {
@@ -52,6 +70,16 @@ describe("hasGroceryIntent", () => {
       expect(
         intent("Saturday trip", [item("doodh"), item("atta"), item("tape")], ["doodh"]),
       ).toBe(false);
+    });
+
+    it("suggests the next Thanksgiving item that is not already on the list", () => {
+      const onList = ["turkey", "stuffing", "corn", "cheese"];
+      expect(nextSeasonalCompanion("Thanksgiving", onList)).toBe("cranberries");
+      expect(nextSeasonalCompanion("Thanksgiving", onList)).not.toBe("bread");
+      expect(nextSeasonalCompanion("Thanksgiving", [...onList, "milk"])).toBe("cranberries");
+      expect(
+        nextSeasonalCompanion("Thanksgiving", [...onList, "milk", "cranberries"]),
+      ).toBe("potatoes");
     });
 
     it("starts re-purchase once a mixed list contains grocery items", () => {

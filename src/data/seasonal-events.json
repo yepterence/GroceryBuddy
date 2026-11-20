@@ -1,0 +1,8 @@
+{
+  "thanksgiving": ["turkey", "stuffing", "cranberries", "corn", "potatoes", "gravy", "pie", "rolls"],
+  "christmas": ["turkey", "cranberry sauce", "stuffing", "potatoes", "gravy"],
+  "birthday": ["cake", "candles", "ice cream"],
+  "bbq": ["buns", "burgers", "ketchup", "mustard", "charcoal"],
+  "potluck": ["chips", "dip", "rolls", "soda"],
+  "party": ["chips", "soda", "dip", "ice"]
+}
