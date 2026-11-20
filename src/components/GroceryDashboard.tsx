@@ -119,6 +119,31 @@ const SavedListAdder = ({
 
   return (
     <li className={shown ? "list-item composer-row" : "list-item"}>
+      <div className="new-item-slot">
+        <input
+          type="checkbox"
+          checked={false}
+          disabled
+          className="input-list-checkbox"
+          aria-hidden="true"
+          tabIndex={-1}
+        />
+        <input
+          type="text"
+          className="new-item-input"
+          placeholder="New Item"
+          aria-label={`New item on ${list.title}`}
+          value={newItem}
+          onChange={handleChange}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitTyped();
+            }
+          }}
+          ref={inputRef}
+        />
+      </div>
       {shown && (
         <SuggestionBubble
           inline
@@ -132,29 +157,6 @@ const SavedListAdder = ({
           onExpand={expand}
         />
       )}
-      <input
-        type="checkbox"
-        checked={false}
-        disabled
-        className="input-list-checkbox"
-        aria-hidden="true"
-        tabIndex={-1}
-      />
-      <input
-        type="text"
-        className="new-item-input"
-        placeholder="New Item"
-        aria-label={`New item on ${list.title}`}
-        value={newItem}
-        onChange={handleChange}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            commitTyped();
-          }
-        }}
-        ref={inputRef}
-      />
     </li>
   );
 };
@@ -260,7 +262,7 @@ const GroceryDashboard = ({ lists }: GroceryLists) => {
           searchFilteredList.map((newList: GroceryList) => (
             <article className="list-card" key={newList.id}>
               <header className="list-card-header">
-                <h3 aria-label="List-Title">{highlightTerm(newList.title, term)}</h3>
+                <h3>{highlightTerm(newList.title, term)}</h3>
                 <div className="list-card-actions">
                   <button
                     type="button"

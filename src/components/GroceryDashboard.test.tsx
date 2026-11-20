@@ -420,6 +420,27 @@ describe("GroceryDashboard", () => {
         "oat milk",
       );
     });
+
+    it("lays the suggestion bubble after the new-item field on the same row", async () => {
+      vi.mocked(fetchRepurchaseSuggestions).mockResolvedValue({
+        suggestions: [oatMilk],
+        knownItemNames: [],
+      });
+      render(<Harness />);
+      await screen.findByText("Weekly");
+      await openSlot("Weekly");
+      await waitFor(() =>
+        expect(fetchRepurchaseSuggestions).toHaveBeenCalledWith("list-1"),
+      );
+
+      const input = screen.getByRole("textbox", { name: "New item on Weekly" });
+      const row = input.closest("li");
+      expect(row).toHaveClass("composer-row");
+      const suggestion = await screen.findByRole("group", { name: "Suggestion" });
+      expect(input.compareDocumentPosition(suggestion)).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+    });
   });
 
   describe("adding a list and refreshing the page", () => {

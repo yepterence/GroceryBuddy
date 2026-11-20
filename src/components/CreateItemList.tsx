@@ -197,18 +197,8 @@ const CreateItemList = () => {
           ))}
         {(shown || title.trim()) && (
           <li className={shown ? "list-item composer-row" : "list-item"}>
-            {shown && (
-              <SuggestionBubble
-                inline
-                suggestion={shown}
-                collapsed={collapsed}
-                onAccept={() => acceptSuggestion(shown)}
-                onDismiss={() => dismissSuggestion(shown)}
-                onExpand={expand}
-              />
-            )}
             {title.trim() && (
-              <>
+              <div className="new-item-slot">
                 <input
                   type="checkbox"
                   checked={false}
@@ -226,7 +216,17 @@ const CreateItemList = () => {
                   onKeyDown={handleKeyDown}
                   ref={nextInputRef}
                 />
-              </>
+              </div>
+            )}
+            {shown && (
+              <SuggestionBubble
+                inline
+                suggestion={shown}
+                collapsed={collapsed}
+                onAccept={() => acceptSuggestion(shown)}
+                onDismiss={() => dismissSuggestion(shown)}
+                onExpand={expand}
+              />
             )}
           </li>
         )}

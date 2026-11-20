@@ -227,6 +227,31 @@ form li.list-item:has(.new-item-input):not(.composer-row) .input-list-checkbox {
     display: none;
 }
 
+form .new-item-slot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 140px;
+    min-width: 8rem;
+    min-height: 44px;
+    padding: 0 8px;
+    border-radius: 10px;
+    background: #f8faf6;
+}
+
+form li:has(.new-item-input):not(.composer-row) .new-item-slot {
+    width: 100%;
+}
+
+form li.composer-row .new-item-slot {
+    flex: 1 1 140px;
+}
+
+form li.composer-row .new-item-input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .composer-row {
     display: flex;
     align-items: center;
@@ -442,10 +467,43 @@ form > button:disabled {
     display: none;
 }
 
+.list-card .new-item-slot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 140px;
+    min-width: 8rem;
+}
+
+.list-card li:has(.new-item-input):not(.composer-row) .new-item-slot {
+    width: 100%;
+}
+
 .list-card li.composer-row {
     border: none;
     margin: 8px 12px;
     padding: 0;
+}
+
+.list-card li.composer-row .new-item-slot {
+    border: 1px solid #e9e3da;
+    border-radius: 10px;
+    padding: 0 8px;
+}
+
+.list-card li.composer-row .suggestion-slot {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+}
+
+.list-card li.composer-row .suggestion-bubble {
+    min-width: 0;
+}
+
+.list-card li.composer-row .new-item-input {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .icon-dismiss {
