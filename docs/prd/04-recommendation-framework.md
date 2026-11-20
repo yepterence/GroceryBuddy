@@ -4,6 +4,7 @@
 > Technical companion: [`../modular-recommendations-design.md`](../modular-recommendations-design.md)
 > Portfolio v1: **BUILD (minimal)** — contract + registry proven with M1, M2, M3;
 > M4/M5/M6 are **design-only**
+> Sequencing (2026-11-19): weighed with PRD 03 after the iOS and hosted-web phase. If chosen, it ships as an update to that iOS app. Dependencies stay PRD 01, 02, and 03.
 
 ---
 

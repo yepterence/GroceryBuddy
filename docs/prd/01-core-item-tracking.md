@@ -114,6 +114,8 @@ Price and store never enter these contracts.
 
 Phase 0 ships the anonymous `user.id` only. There is no password, email, or session table.
 
+This gate is the start of the phase after PRD 02, because that phase puts the list app on iOS and on a public web URL ([ADR 0002](../adr/0002-anonymous-device-bound-shopper.md)).
+
 Before Docker, any deployment treated as production, or the mobile version ([ADR 0002](../adr/0002-anonymous-device-bound-shopper.md)):
 
 - Authentication must establish who is calling.
